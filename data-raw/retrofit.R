@@ -79,10 +79,10 @@ result = lapply(dfs, function(x) {
     {.}
 })
 
-prev_actions = dplyr::bind_rows(result) %>%
+retrofit_prev_actions = dplyr::bind_rows(result) %>%
   {.}
 
-usethis::use_data(prev_actions, overwrite = T)
+usethis::use_data(retrofit_prev_actions, overwrite = T)
 
 load("../data/energy_monthly_web_withloc.rda")
 
@@ -94,7 +94,7 @@ time.retro = retro_long %>%
 ## energy for retrofitted buildings
 energydata.retro = energy_monthly_web_withloc %>%
   dplyr::filter(BLDGNUM %in% unique(time.retro$`BLDGNUM`)) %>%
-  dplyr::select(BLDGNUM, Year, Month, variable, amt.kbtu, GROSSSQFT) %>%
+  dplyr::select(BLDGNUM, Year, Month, variable, amt.kbtu, GROSSSQFT, BLDGCAT, REGNNUM) %>%
   dplyr::mutate(`time`=sprintf("%04d-%02d-15", `Year`, `Month`)) %>%
   dplyr::mutate(`time`=as.POSIXct(time)) %>%
   {.}
@@ -109,16 +109,20 @@ energy.pre.period <- energy.retro %>%
                 time <  `Substantial_Completion_Date` - lubridate::years(2)) %>%
   dplyr::ungroup() %>%
   dplyr::mutate(retro.status = "pre") %>%
+  dplyr::mutate(is.real.retrofit = T) %>%
   {.}
 
 avg.energy.pre <- energy.pre.period %>%
   dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
   dplyr::summarise(mean.kbtu = mean(amt.kbtu),
                    GROSSSQFT = mean(GROSSSQFT),
+                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
+                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
                    start = min(time),
                    end = max(time)) %>%
   dplyr::ungroup() %>%
   dplyr::mutate(retro.status = "pre") %>%
+  dplyr::mutate(is.real.retrofit = T) %>%
   na.omit() %>%
   {.}
 
@@ -128,23 +132,103 @@ energy.post.period <- energy.retro %>%
                 time <  `Substantial_Completion_Date` + lubridate::years(3)) %>%
   dplyr::ungroup() %>%
   dplyr::mutate(retro.status = "post") %>%
+  dplyr::mutate(is.real.retrofit = T) %>%
   {.}
 
 avg.energy.post <- energy.post.period %>%
   dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
   dplyr::summarise(mean.kbtu = mean(amt.kbtu),
                    GROSSSQFT = mean(GROSSSQFT),
+                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
+                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
                    start = min(time),
                    end = max(time)) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(retro.status = "post") %>%
   na.omit() %>%
+  dplyr::mutate(retro.status = "post") %>%
+  dplyr::mutate(is.real.retrofit = T) %>%
   {.}
 
-## create a fake retrofit time by median of the actual retrofit dates
-median.retro.date =
+set.seed(0)
 
-  time.retro %>%
-  dplyr::distinct()
+## use random sampled retrofit dates from actual retrofits
+fake.time.retro = energy_monthly_web_withloc %>%
+  dplyr::distinct(BLDGNUM) %>%
+  dplyr::filter(!(BLDGNUM %in% unique(time.retro$`BLDGNUM`))) %>%
+  dplyr::mutate(`Substantial_Completion_Date`=sample(time.retro$Substantial_Completion_Date,
+                                                     size=nrow(.), replace=T)) %>%
+  {.}
 
-## use similar approach to create energy file for non-retrofitted buildings
+usethis::use_data(fake.time.retro)
+
+energydata.no.retro = energy_monthly_web_withloc %>%
+  dplyr::select(BLDGNUM, Year, Month, variable, amt.kbtu, GROSSSQFT, BLDGCAT, REGNNUM) %>%
+  dplyr::filter(!(BLDGNUM %in% unique(time.retro$`BLDGNUM`))) %>%
+  dplyr::mutate(`time`=sprintf("%04d-%02d-15", `Year`, `Month`)) %>%
+  dplyr::mutate(`time`=as.POSIXct(time)) %>%
+  {.}
+
+## modify the following: fixme
+energy.no.retro = fake.time.retro %>%
+  dplyr::left_join(energydata.no.retro, by=c("BLDGNUM")) %>%
+  {.}
+
+energy.pre.fake.period <- energy.no.retro %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`) %>%
+  dplyr::filter(`Substantial_Completion_Date` - lubridate::years(5) <= time,
+                time <  `Substantial_Completion_Date` - lubridate::years(2)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(retro.status = "pre") %>%
+  dplyr::mutate(is.real.retrofit = F) %>%
+  {.}
+
+avg.energy.fake.pre <- energy.pre.fake.period %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
+  dplyr::summarise(mean.kbtu = mean(amt.kbtu),
+                   GROSSSQFT = mean(GROSSSQFT),
+                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
+                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
+                   start = min(time),
+                   end = max(time)) %>%
+  dplyr::ungroup() %>%
+  na.omit() %>%
+  dplyr::mutate(retro.status = "pre") %>%
+  dplyr::mutate(is.real.retrofit = F) %>%
+  {.}
+
+energy.post.fake.period <- energy.no.retro %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`) %>%
+  dplyr::filter(`Substantial_Completion_Date` <= time,
+                time <  `Substantial_Completion_Date` + lubridate::years(3)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(retro.status = "post") %>%
+  dplyr::mutate(is.real.retrofit = F) %>%
+  {.}
+
+avg.energy.fake.post <- energy.post.fake.period %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
+  dplyr::summarise(mean.kbtu = mean(amt.kbtu),
+                   GROSSSQFT = mean(GROSSSQFT),
+                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
+                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
+                   start = min(time),
+                   end = max(time)) %>%
+  dplyr::ungroup() %>%
+  na.omit() %>%
+  dplyr::mutate(retro.status = "post") %>%
+  dplyr::mutate(is.real.retrofit = F) %>%
+  {.}
+
+retrofit.avg.energy.sf.cat.rg <- dplyr::bind_rows(avg.energy.pre,
+                                                  avg.energy.post,
+                                                  avg.energy.fake.pre,
+                                                  avg.energy.fake.post)
+
+usethis::use_data(retrofit.avg.energy.sf.cat.rg)
+
+retrofit.energy <- dplyr::bind_rows(energy.pre.period,
+                                    energy.post.period,
+                                    energy.pre.fake.period,
+                                    energy.post.fake.period)
+
+usethis::use_data(retrofit.energy)
