@@ -1,0 +1,13 @@
+Package: retrofitClimateEffect
+Title: retrofit climate effect analysis
+Version: 0.0.0.9000
+Authors@R: 
+    person(given = "Yujie",
+           family = "Xu",
+           role = c("aut", "cre"),
+           email = "first.last@example.com",
+           comment = structure("YOUR-ORCID-ID", .Names = "ORCID"))
+Description: It analyzes conditional average treatment effect of building retrofits on energy consumption.
+License: What license it uses
+Encoding: UTF-8
+LazyData: true
