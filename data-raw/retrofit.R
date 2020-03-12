@@ -112,39 +112,11 @@ energy.pre.period <- energy.retro %>%
   dplyr::mutate(is.real.retrofit = T) %>%
   {.}
 
-avg.energy.pre <- energy.pre.period %>%
-  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
-  dplyr::summarise(mean.kbtu = mean(amt.kbtu),
-                   GROSSSQFT = mean(GROSSSQFT),
-                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
-                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
-                   start = min(time),
-                   end = max(time)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(retro.status = "pre") %>%
-  dplyr::mutate(is.real.retrofit = T) %>%
-  na.omit() %>%
-  {.}
-
 energy.post.period <- energy.retro %>%
   dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`) %>%
   dplyr::filter(`Substantial_Completion_Date` <= time,
                 time <  `Substantial_Completion_Date` + lubridate::years(3)) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(retro.status = "post") %>%
-  dplyr::mutate(is.real.retrofit = T) %>%
-  {.}
-
-avg.energy.post <- energy.post.period %>%
-  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
-  dplyr::summarise(mean.kbtu = mean(amt.kbtu),
-                   GROSSSQFT = mean(GROSSSQFT),
-                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
-                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
-                   start = min(time),
-                   end = max(time)) %>%
-  dplyr::ungroup() %>%
-  na.omit() %>%
   dplyr::mutate(retro.status = "post") %>%
   dplyr::mutate(is.real.retrofit = T) %>%
   {.}
@@ -182,20 +154,6 @@ energy.pre.fake.period <- energy.no.retro %>%
   dplyr::mutate(is.real.retrofit = F) %>%
   {.}
 
-avg.energy.fake.pre <- energy.pre.fake.period %>%
-  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
-  dplyr::summarise(mean.kbtu = mean(amt.kbtu),
-                   GROSSSQFT = mean(GROSSSQFT),
-                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
-                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
-                   start = min(time),
-                   end = max(time)) %>%
-  dplyr::ungroup() %>%
-  na.omit() %>%
-  dplyr::mutate(retro.status = "pre") %>%
-  dplyr::mutate(is.real.retrofit = F) %>%
-  {.}
-
 energy.post.fake.period <- energy.no.retro %>%
   dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`) %>%
   dplyr::filter(`Substantial_Completion_Date` <= time,
@@ -205,30 +163,72 @@ energy.post.fake.period <- energy.no.retro %>%
   dplyr::mutate(is.real.retrofit = F) %>%
   {.}
 
-avg.energy.fake.post <- energy.post.fake.period %>%
-  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
-  dplyr::summarise(mean.kbtu = mean(amt.kbtu),
-                   GROSSSQFT = mean(GROSSSQFT),
-                   BLDGCAT = paste(unique(BLDGCAT), collapse = ";"),
-                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
-                   start = min(time),
-                   end = max(time)) %>%
-  dplyr::ungroup() %>%
-  na.omit() %>%
-  dplyr::mutate(retro.status = "post") %>%
-  dplyr::mutate(is.real.retrofit = F) %>%
-  {.}
-
-retrofit.avg.energy.sf.cat.rg <- dplyr::bind_rows(avg.energy.pre,
-                                                  avg.energy.post,
-                                                  avg.energy.fake.pre,
-                                                  avg.energy.fake.post)
-
-usethis::use_data(retrofit.avg.energy.sf.cat.rg)
-
 retrofit.energy <- dplyr::bind_rows(energy.pre.period,
                                     energy.post.period,
                                     energy.pre.fake.period,
                                     energy.post.fake.period)
 
 usethis::use_data(retrofit.energy)
+
+## solving conflict by randomly selecting one building category
+## Following are the conflicting ones, no impact on ownership
+## retrofit.energy %>%
+##   dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable, retro.status,
+##                   is.real.retrofit, BLDGCAT) %>%
+##   dplyr::count() %>%
+##   dplyr::ungroup() %>%
+##   dplyr::distinct(BLDGNUM, `Substantial_Completion_Date`, variable, retro.status,
+##                   is.real.retrofit, BLDGCAT, n) %>%
+##   dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable, retro.status,
+##                   is.real.retrofit) %>%
+##   dplyr::filter(length(BLDGCAT[n==max(n)]) > 1) %>%
+##   dplyr::ungroup() %>%
+##   readr::write_csv("counts.csv")
+## BLDGNUM	Substantial_Completion_Date	variable	retro.status	is.real.retrofit	BLDGCAT	n
+## AL0028ZZ	2012-03-16T04:00:00Z	KWHR	post	TRUE	A	18
+## AL0028ZZ	2012-03-16T04:00:00Z	KWHR	post	TRUE	B	18
+## MD0827WO	2012-09-26T04:00:00Z	KWHR	post	FALSE	E	12
+## MD0827WO	2012-09-26T04:00:00Z	KWHR	post	FALSE	I	12
+## MS0080ZZ	2012-10-05T04:00:00Z	KWHR	pre	  FALSE	A	12
+## MS0080ZZ	2012-10-05T04:00:00Z	KWHR	pre	  FALSE	B	12
+## ND0000AO	2012-03-19T04:00:00Z	KWHR	pre	  FALSE	B	18
+## ND0000AO	2012-03-19T04:00:00Z	KWHR	pre	  FALSE	I	18
+## TX0000DL	2011-03-30T04:00:00Z	KWHR	pre	  FALSE	B	18
+## TX0000DL	2011-03-30T04:00:00Z	KWHR	pre	  FALSE	I	18
+
+category.ownership <- retrofit.energy %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable, retro.status,
+                  is.real.retrofit, BLDGCAT) %>%
+  dplyr::count() %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable, retro.status,
+                  is.real.retrofit) %>%
+  dplyr::summarise(BLDGCAT = sample(BLDGCAT[n==max(n)], size=1)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(ownershiped = ifelse(BLDGCAT %in% c("C", "D"), "leased", "owned")) %>%
+  {.}
+
+load("../data/building.type.lookup.rda")
+
+building.type.lookup <- building.type.lookup %>%
+  dplyr::select(-`data_source`)
+
+retrofit.avg.energy <- retrofit.energy %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable, retro.status,
+                  is.real.retrofit) %>%
+  dplyr::summarise(mean.kbtu = mean(amt.kbtu),
+                   GROSSSQFT = mean(GROSSSQFT),
+                   REGNNUM = paste(unique(REGNNUM), collapse = ";"),
+                   start = min(time),
+                   end = max(time)) %>%
+  dplyr::ungroup() %>%
+  na.omit() %>%
+  dplyr::left_join(category.ownership,
+                   by=c("BLDGNUM", "Substantial_Completion_Date", "variable",
+                        "retro.status", "is.real.retrofit")) %>%
+  dplyr::left_join(building.type.lookup, by=c("BLDGNUM"="Building_Number")) %>%
+  {.}
+
+usethis::use_data(retrofit.avg.energy, overwrite = T)
+
+
