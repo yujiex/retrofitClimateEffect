@@ -113,12 +113,6 @@ clean.result.check(energy_monthly_web)
 
 load("../data/energy_monthly_web.rda")
 
-## energy_monthly_web <- energy_monthly_web %>%
-##   dplyr::filter(!STATE %in% c("AK", "HI", "VI", "GU", "PR", "VI", "MP")) %>%
-##   {.}
-
-## clean.result.check(energy_monthly_web)
-
 usethis::use_data(energy_monthly_web, overwrite = T)
 
 area.cat <- readxl::read_excel("mar.fyrbuilding.xlsx") %>%
@@ -155,15 +149,21 @@ clean.result.check(energy_monthly_web)
 
 usethis::use_data(energy_monthly_web, overwrite = T)
 
-load("../data/building_location.rda")
+load("../../data/building_location.rda")
 
 energy_monthly_web_withloc <- energy_monthly_web %>%
-  dplyr::filter(BLDGNUM %in% (building_location$BLDGNUM)) %>%
+  dplyr::filter(BLDGNUM %in% unique(building_location$BLDGNUM)) %>%
   {.}
 
 clean.result.check(energy_monthly_web_withloc)
 
 usethis::use_data(energy_monthly_web_withloc, overwrite = T)
+
+energy_monthly_web_continental <- energy_monthly_web_withloc %>%
+  dplyr::filter(!STATE %in% c("AK", "HI", "VI", "GU", "PR", "VI", "MP")) %>%
+  {.}
+
+clean.result.check(energy_monthly_web_continental)
 
 load("../data/energy_monthly_web_withloc.rda")
 
