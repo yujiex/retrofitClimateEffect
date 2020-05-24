@@ -15,23 +15,56 @@ longterm = energy_90_to_18 %>%
   dplyr::rename(latitude=Latitude, longitude=Longitude) %>%
   {.}
 
+## check whether downloaded
+## files = list.files("weather_data/ghcnd_/", "building_TMIN_[0-9]{4}-01-01_with_distance.csv")
+
+## result = lapply(files, function(f) {
+##   readr::read_csv(paste0("weather_data/ghcnd_/", f))
+## })
+
+## df.tmin = dplyr::bind_rows(result)
+
+## max(df.tmin$date)
+
+## length(unique(df.tmin$building))
+
+## df.tmin %>%
+##   dplyr::filter(lubridate::year(date) == 2008) %>%
+##   dplyr::distinct(building) %>%
+##   nrow()
+
+##   {.}
+
+## dfs = df.tmin %>%
+##   dplyr::group_by(building) %>%
+##   dplyr::group_split()
+
+## result = lapply(dfs, function(x) {
+##   b = x$building[[1]]
+##   x %>%
+##     readr::write_csv(paste0("weather_data/ghcnd_longterm_by_building/", b, "_TMAX.csv"))
+## })
+
 ## variable to download
-v = "TMAX"
+## v = "TMAX"
 ## v = "TMIN"
+
+v = "PRCP"
 
 buildings = longterm$BLDGNUM
 
 ## startdates = seq(as.Date("1990-01-01"), as.Date("1999-01-01"), "year")
 ## enddates = seq(as.Date("1991-01-01"), as.Date("2000-01-01"), "year") - 1
-startdates = seq(as.Date("2000-01-01"), as.Date("2008-01-01"), "year")
-enddates = seq(as.Date("2001-01-01"), as.Date("2009-01-01"), "year") - 1
-## startdates = seq(as.Date("2009-01-01"), as.Date("2018-01-01"), "year")
-## enddates = seq(as.Date("2010-01-01"), as.Date("2019-01-01"), "year") - 1
+## startdates = seq(as.Date("2000-01-01"), as.Date("2008-01-01"), "year")
+## enddates = seq(as.Date("2001-01-01"), as.Date("2009-01-01"), "year") - 1
+startdates = seq(as.Date("2011-01-01"), as.Date("2014-01-01"), "year")
+enddates = seq(as.Date("2012-01-01"), as.Date("2015-01-01"), "year") - 1
 
 for (j in seq_along(startdates)) {
   buildings = longterm$BLDGNUM
   date_min = startdates[[j]]
   date_max = enddates[[j]]
+  
   print(sprintf("start date: %s-------------------", date_min))
   ghcnd_data_var = ghcnd_data_full %>%
     dplyr::filter(`element` == v) %>%

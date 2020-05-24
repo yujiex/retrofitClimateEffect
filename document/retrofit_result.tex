@@ -1,0 +1,667 @@
+% note: XX means needs modification
+\documentclass[12pt]{article}
+\linespread{1.3}
+\usepackage{scrextend}
+\usepackage{hyperref}
+% \usepackage{enumitem}
+\usepackage{enumerate}
+\usepackage{changepage,titlesec}
+\usepackage{cite}
+\usepackage{comment, xcolor}
+\usepackage{csvsimple}
+\usepackage[pdftex]{graphicx}
+  \graphicspath{{images/}, {images/stat/}}
+  \DeclareGraphicsExtensions{.pdf,.jpeg,.png, .jpg}
+\usepackage[cmex10]{amsmath}
+\usepackage{array} 
+% \usepackage{subfigure} 
+\usepackage{subcaption} 
+% \usepackage{placeins} 
+\usepackage{amsfonts}
+\usepackage{pifont}% http://ctan.org/pkg/pifont
+\usepackage{fancyvrb}
+% \usepackage{lipsum}
+\usepackage{booktabs}
+% \usepackage{multirow}
+% \usepackage{pdflscape}
+\usepackage{float}
+% \usepackage{minted}
+% \usepackage{natbib}
+% \usepackage{apacite} 
+
+\newcommand{\cmark}{\ding{51}}%
+\newcommand{\xmark}{\ding{55}}%
+\newcommand{\grey}[1]{\textcolor{black!30}{#1}}
+\newcommand{\red}[1]{\textcolor{red!50}{#1}}
+\newcommand{\fref}[1]{Figure~\ref{#1}}
+\newcommand{\tref}[1]{Table~\ref{#1}}
+\newcommand{\eref}[1]{Equation~\ref{#1}}
+\newcommand{\sref}[1]{Section~\ref{#1}}
+\newcommand\myworries[1]{\textcolor{red}{\{#1\}}}
+\newenvironment{loggentry}[2]% date, heading
+{\noindent\textbf{#2}\marginnote{#1}\\}{\vspace{0.5cm}}
+
+\oddsidemargin0cm
+\topmargin-2cm %I recommend adding these three lines to increase the
+\textwidth16.5cm %amount of usable space on the page (and save trees)
+\textheight23.5cm
+
+\makeatletter
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}%
+            {-2.5ex\@plus -1ex \@minus -.25ex}%
+            {1.25ex \@plus .25ex}%
+            {\normalfont\normalsize\bfseries}}
+\makeatother
+\setcounter{secnumdepth}{4} % how many sectioning levels to assign numbers to
+\setcounter{tocdepth}{4}    % how many sectioning levels to show in ToC
+
+\begin{document}
+\title{Data processing}
+\maketitle
+\tableofcontents
+\newpage
+\section{Introduction}
+\section{Background}
+\section{Data source}
+\subsection{Energy Data} The monthly energy consumption data of the GSA
+portfolio is from the Energy Usage Analysis System (EUAS)~\cite{euas2019}. It
+contains monthly consumption data of a variety of fuel types including:
+electricity, natural gas, steam, oil, coal, and chilled water. 
+                                    
+The EUAS data set contains energy data from fiscal year 1973 to 2019. As the
+data is updated on 2019 March, we restrict the analysis to 2018 and before.
+
+\fref{fig:euas_web_num_building} shows the number of buildings in each Fiscal
+Year. We can see there's some discrepancy in the energy before 1990, thus we
+restrict our analysis to data after 1989. \fref{fig:euas_web_num_year} shows the
+distribution of the number of years of data for individual buildings. We can see
+the majority of buildings has less than 10 years of data, but there's also a
+substantial number of buildings with long-term data over 20 or 30 years.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../images/euas_web_num_building.png}
+  \caption{Number of buildings in each fiscal year}
+  \label{fig:euas_web_num_building}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../images/euas_web_num_year.png}
+  \caption{Distribution of how many years of data a building has}
+  \label{fig:euas_web_num_year}
+\end{figure}
+
+\fref{fig:buildingloc_1990_2018} plots the geographical locations of buildings
+in 1990 and in 2018. This together with \fref{fig:euas_web_num_building} shows
+that the number of buildings in the GSA portfolio gradually decreases over the
+years.
+
+\begin{figure*}[t!]
+    \centering
+    \begin{subfigure}[t]{0.7\textwidth}
+        \centering
+        \includegraphics[width=1.0\textwidth]{../images/buildingloc_1990.png}
+        \caption{Buildings in 1990}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.7\textwidth}
+        \centering
+        \includegraphics[width=1.0\textwidth]{../images/buildingloc_2018.png}
+        \caption{Buildings in 2018}
+    \end{subfigure}
+    \caption{Buildings in 1990 and 2018}
+    \label{fig:buildingloc_1990_2018}
+\end{figure*}
+
+\subsection{Weather Data}
+The daily min and max temperature, and daily precipitation are downloaded from
+NOAA using R package rnoaa~\cite{rnoaa2017}. Each building is matched to 5
+nearby weather stations with at least 80\% data each given year. The weather at
+each building location will be an inverse distance weighted average of the
+nearby stations. On average, the stations are 4 to 20 miles from the building,
+and at least one station is within 20 miles from a building at all time.
+
+\subsection{Climate Normals}
+Annual cooling and heating degree days 1981-2010 climate normal NOAA
+FTP~\cite{NOAAclimateNormal2020}. For each building, we find all weather
+stations within 20 mile radius to the building, and use the inverse-distance
+weighted average of the climate normals of all the weather stations as its
+climate normal.
+
+\subsection{Climate Change Scenarios}
+The climate data of daily min and daily max temperature (tmin and tmax), and
+daily precipitation of the bias corrected downscaled climate scenario data
+(BCCA) for the continental US during 2011-2014, 2050-2059, and 2090-2099 are
+downloaded from the of 19 climate models from the ``Downscaled CMIP3 and CMIP5
+Climate and Hydrology Projections'' archive~\cite{Reclamation2013}. The data has
+a spatial resolution of 1/8 degrees. The NEX-GDDP dataset has a resolution of
+1/4 degrees, coarser than the former, thus I used the former data set. There are
+overall 21 climate models, but as we want to have models appear in all three
+period, we restrict the analysis for the 19 models.
+
+% fixme: need to list the models
+
+Following is a visualization of the grid points of one time snapshot of one
+model.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{../images/climate_scenario_grid_us.png}
+  \caption[daily max temperature grid]{Daily max temperature of one model one
+    day for the whole US}
+  \label{fig:climate_scenario_grid_us}
+\end{figure}
+
+The following is a zoomed-in plot of a sub-region.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{../images/zoomed_climate_scenario_grid_us.png}
+  \caption[daily max temperature grid]{Daily max temperature of one model one
+    day for Pennsylvania}
+  \label{fig:zoomed_climate_scenario_grid_us}
+\end{figure}
+
+% \begin{figure}[H]
+%   \centering
+%   \includegraphics[width=0.8\textwidth]{../images/retrofit_cmip5_loc.png}
+%   \caption[cmip5 availability for retrofit data set]{Climate scenario data
+%     availability for the retrofit data set}
+%   \label{fig:retrofit_cmip5_loc}
+% \end{figure}
+
+\subsection{Building characteristics}
+Building size (gross square foot), category, region number are retrieved from
+the EUAS data set. Building ownership is derived from building category.
+
+Building type is acquired from multiple data sources, including the
+output excel table from Energy Star Portfolio Manager~\cite{portfolioManager2016}, 
+a excel data file from the GSA team, and the 2012 and 2014 EPA National
+Building Competition records~\cite{nationalCompetitionEPA2012, nationalCompetitionEPA2014}.
+
+Indicator for historic building is from the GSA Historic Building Database~\cite{GSAhistoricBuilding2020}.
+
+\subsection{Retrofits}
+The retrofit records are from four excel files acquired from the GSA team:
+``Light-Touch\_M\&V'', ``Portfolio HPGB Dashboard'' and
+``GSAlink\_Buildings\_First\_55'', and ``ScopePortfolioReport\_20160105-7''.
+
+\section{Summary statistics}
+
+% In the retrofit analysis, we control for the following covariates
+% \begin{itemize}
+% \item Pre-retrofit actions: an indicator of whether certain type of retrofit
+%   action $A$ happen during or before the target retrofit $A'$
+% \item Pre-retrofit average monthly consumption ($kbtu/sqft$): an indicator of whether certain type of retrofit
+%   action $A$ happen during or before the target retrofit $A'$
+% \end{itemize}
+
+We plotted the energy consumption trend for the retrofit impact analysis data
+set. We can see average kBtu/sqft consumption for the retrofitted building is
+slightly lower than the non-retrofitted buildings prior to retrofits. However
+the difference between them widens after the retrofit, especially during the
+summer months.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.0\textwidth]{../images/energy_retrofit_status_highprop.png}
+  \caption[Energy trend retrofit study]{Energy consumption trend for retrofit
+    building study set}
+  \label{fig:energy_retrofit_status}
+\end{figure}
+
+The following table shows the retrofit building count
+\input{../tables/detail_retrofit_building_count.tex}
+
+The following checks the balance between the retrofitted and non-retrofitted buildings.
+
+\input{../tables/numeric_feature_balance_compare.tex}
+\input{../tables/indicator_feature_balance_compare.tex}
+
+We estimated propensity score with logistic regression. After removing
+records with propensity score that are below 0.05 or above 0.95, the covariate
+balance is as follows
+
+\input{../tables/numeric_feature_balance_compare_highprop.tex}
+\input{../tables/indicator_feature_balance_compare_highprop.tex}
+
+The distribution of the propensity score is shown in 
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../images/propensity_by_treat_highprop.png}
+  \caption[Propensity score distribution]{Propensity score difference}
+  \label{fig:propensity}
+\end{figure}
+
+We examined the difference of energy consumption, and energy consumption per
+square foot difference of four different fuel types.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../images/diff_mean_energy.png}
+  \caption[Energy trend retrofit study]{Pre and post retrofit difference in average monthly
+    consumption (kBtu)}
+  \label{fig:diff_mean_energy}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.7\textwidth]{../images/diff_mean_eui.png}
+  \caption[Energy trend retrofit study]{Pre and post retrofit difference in average monthly
+    consumption per square foot (kBtu/sqft)}
+  \label{fig:diff_mean_eui}
+\end{figure}
+
+The retrofitted buildings is slightly larger.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.4\textwidth]{../images/retrofit_building_size.png}
+  \caption[Building size]{Building size distribution}
+  \label{fig:retrofit_building_size}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{../images/retrofit_building_type.png}
+  \caption[Building type]{Building type}
+  \label{fig:retrofit_building_type}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{../images/retrofit_building_historic.png}
+  \caption[Historic buildings]{Number of historic and non-historic buildings}
+  \label{fig:retrofit_building_historic}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{../images/retrofit_pre_consumption.png}
+  \caption[Pre-retrofit energy]{Pre-retrofit average monthly consumption}
+  \label{fig:retrofit_pre_consumption}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.4\textwidth]{../images/retrofit_pre_climate_normal.png}
+  \caption[Pre-retrofit climate normal]{Pre-retrofit climate normal}
+  \label{fig:retrofit_pre_climate_normal}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.0\textwidth]{../images/retrofit_pre_temperature_bin.png}
+  \caption[Pre-retrofit weather]{Pre-retrofit temperature distribution}
+  \label{fig:retrofit_pre_temperature_bin}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=1.0\textwidth]{../images/retrofit_pre_action.png}
+  \caption[Pre-retrofit weather]{Other retrofits co-exist or prior to the target
+  retrofit}
+  \label{fig:retrofit_pre_action}
+\end{figure}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{../images/retrofit_climate_scenario.png}
+  \caption[Climate scenario]{Temperature distribution for different climate
+    scenarios and models}
+  \label{fig:retrofit_climate_scenario}
+\end{figure}
+
+\section{Models and results}
+\subsection{Causal forest}
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{../images/retrofit_effect_cf.png}
+  \caption[Causal forest prediction]{Distribution of treatment effect}
+  \label{fig:retrofit_effect_cf}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{../images/var_importance_cf_envelope_gas.png}
+  \caption[Causal forest variable importance]{Covariate variable importance}
+  \label{fig:var_importance_cf_envelope_gas}
+\end{figure}
+
+\subsection{Synthetic control}
+\section{Discussion / Interpretation}
+\section{Conclusion}
+\section{Acknowledgment}
+We acknowledge the World Climate Research Programme's Working Group on Coupled
+Modelling, which is responsible for CMIP, and we thank the climate modeling
+groups (listed in \tref{tab:climate_models} of this paper) for producing and making available
+their model output. For CMIP the U.S. Department of Energy's Program for Climate
+Model Diagnosis and Intercomparison provides coordinating support and led
+development of software infrastructure in partnership with the Global
+Organization for Earth System Science Portals.
+
+\section{Appendix I: Data cleaning}
+\subsection{Monthly energy data from EUAS} The consumption data is in the table
+``mar.energyutilization.xlsx'', downloaded from ~\cite{euas2019}. The data file
+has the following fields: BLDGNUM, FYR, FMONTH, KWHRAMT, KWDMDAMT, STEAMAMT,
+GASAMT, OILAMT, COALAMT, KWHRCOST, KWDMDCOST, STEAMCOST, GASCOST, OILCOST,
+COALCOST, KWHRASRC , KWHRDMDASRC, STEAMASRC, GASASRC, OILASRC, COALASRC,
+KWHRCSRC, KWDMDCSRC, STEAMCSRC, GASCSRC, OILCSRC, COALCSRC, CHILLWTRAMT,
+CHILLWTRCOST, CHILLWTRCSRC, CHILLWTRASRC, REMARKS, WTRAMT, WTRCOST, WTRCSRC,
+WTRASRC , REELECAMT, REELECCOST, REELECCSRC, REELECASRC, REGASAMT, REGASCOST,
+REGASCSRC, REGASASRC, RECWTRAMT, RECWTRCOST, RECWTRCSRC, RECWTRASRC, REOILAMT,
+REOILCOST, REOILCSRC, REOILASRC, WATER\_REMARKS. Some column names are self
+explanatory, for example, the columns ending with ``AMT'' are likely to be
+energy consumptions, and the ones ending with ``COST'' are likely utility
+expenses in dollars. Other columns have non-trivial names, for example, the ones
+ending with ``CSRC'' and ``ASRC''. These columns are excluded from the analysis.
+The columns with prefix ``RE'' are likely to be renewable energy. However we are
+uncertain whether they are consumption or output, thus are also excluded from
+the analysis.
+
+The following table shows the cleaning steps and the remaining records of the
+monthly energy.
+
+\begin{table}[H]
+  \caption{Cleaning steps and records remaining}
+  \centering
+  \fontsize{10}{12}\selectfont
+  \begin{tabular}{l|p{6cm}|l|l}
+  \toprule
+    step & operation &number of buildings& number of records\\
+  \midrule
+    1& Initial& 3494 &6166413\\
+    2& Remove records with negative consumption & 3494 & 6166411\\
+    3& Remove the records for each fuel and Fiscal Year where total consumption is zero & 3274 & 1181741\\
+    4& The study does not analyze water consumption, so removed them & 3271 & 1062104\\
+    5& Has state city location \footnote{We have seen cases where the initials of the building ID do not correspond to the state abbreviation of the state the building locates in, so we remove records which we cannot find a definite information about its state} & 3253 & 1060939\\
+    6& With building size, category, and region information & 3253 & 1060939\\
+    7& Gross square foot is larger than 1 sqft & 3182 & 1052392\\
+    8& With valid zip code or city information so that the latitude longitude could be retrieved & 3167 & 1050388\\
+    9& Within continental US (not in AK, HI, VI, GU, PR, VI, MP) & 3058 & 1027178\\
+    10& With energy from 1990 to 2018 & 499 & 173652\\
+  \bottomrule
+  \end{tabular}
+  \label{tab:cleaning_steps}
+\end{table}
+
+The consumption data are converted to kBtu using the table
+``mar.unitconversions.xlsx'' from~\cite{euas2019}.
+
+\subsection{Weather Data}
+
+\subsection{Climate Data}
+
+\subsection{Building location} The building state, city, zipcode information are in
+the ``mar.facilitybuildings.xlsx'' file of the EUAS data set~\cite{euas2019}.
+3181 buildings appear in this data file. We first matched the zipcode and state
+to a zipcode centroid location lookup table,
+``us-zip-code-latitude-and-longitude.csv'' from \cite{civicSpace2020} and the
+\texttt{us\_zipcodes()} output from the R package USAboundaries \cite{USAboundaries2018},
+to get the latitude longitude location of the zipcode. The building is assumed
+to located at the centroid of its zip code region. We need the latitude
+longitude of a building in order to retrieve the local weather data, thus we
+think the zip code resolution is enough. 3055 buildings are matched up in this
+process. We suspect these non-matched buildings have some errors in the
+documented zip code information. We looked up the centroid of cities the
+non-matched building located in, and found their latitude longitude with the
+\texttt{us\_cities()} function from the R package USAboundaries \cite{USAboundaries2018},
+and some manual lookup with Google Maps. Finally 3167 out of the 3181 records
+are matched to a latitude longitude location, with 3055 matched to its zip code,
+and 112 buildings matched to its city centroid.
+
+\subsection{Building gross square foot, and ownership} Acquired from the
+``mar.fyrbuilding.xlsx'' file in the EUAS data set~\cite{euas2019}. This file
+has building id (BLDGNUM), the region a building belongs to (REGNNUM), fiscal
+year (FYR), building category (BLDGCAT), gross square foot (GROSSSQFT), whether
+a building is goal tracked (GOAL TRACKED). This file is joined to the monthly
+consumption file, by building id and fiscal year. When the building category or
+gross square foot are missing for certain fiscal year, it is filled with the
+most recent year where data is available.
+
+The ownership is derived from the building category (BLDGCAT). According to
+\cite{Burke2017}, the building category definitions are. According to the
+category designations, we'll assume buildings in category C or D are leased,
+others are owned.
+
+\begin{table}[H]
+  \caption{Building category definition}
+  \centering
+  \fontsize{10}{12}\selectfont
+  \begin{tabular}{l|l}
+  \toprule
+    BLDGCAT & Definition \\
+    \midrule 
+    A, B & government owned \\
+    C, D & non-goal leased \\
+    I & Goal Energy Intensive \\
+    E & Reimbursable \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:building_cat}
+\end{table}
+
+\subsection{Building Type} Building types affects when and how buildings are
+operated, thus affecting its energy consumption pattern. It also might impact
+some other physical aspects of the building, and its retrofit decisions. In the
+GSA data set, there are 4 different sources of building types, one from the
+output from Energy Star Portfolio Manager~\cite{portfolioManager2016}, one from
+a excel file from the GSA team, and the 2012 and 2014 EPA National
+Building Competition records from online
+sources~\cite{nationalCompetitionEPA2012, nationalCompetitionEPA2014}.
+
+Among these sources, many have disagreement on what type a building belongs to.
+We first removed the type called ``Other'' and ``All other'', as these labels
+provides no type information. Secondly, we have noticed that ``Office'' seems to
+be used as a default type, and the name of some buildings suggest they are of
+some different category. For example, we've seen parking lots, and heating
+plants labeled as offices. As a result, when we see a building with multiple
+type labels, we will give higher priority to other types labels. For example,
+when a building is labeled warehouse and office, we'll consider it to be
+warehouse. A second metric for deciding among conflicting building type labels
+is to choose the more specific type. For example, when a building is labeled as
+both ``Public Service'' and ``Service'', we choose the ``Public services''
+label. Also when a building is labeled as both ``Entertainment/PA'' and
+``Museum'', we label them as ``Museum''.
+
+The labeling of certain building types have slightly different wording among
+different sources. We thus unified and relabeled certain building types (see
+\tref{tab:building_type_relabel}). We conducted the following relabeling.
+``Mailing Center/Post Office'' are all re-labeled as ``Office'', as they have
+similar operation pattern and we can see they have relatively similar EUI
+according to the table in~\cite{euiPortfolioManager2018}.
+
+\begin{table}[H]
+  \caption{Relabel of certain building types}
+  \centering
+  \fontsize{10}{12}\selectfont
+  \begin{tabular}{l|l}
+    \toprule
+    Old&New\\
+    \midrule
+    Office Building & Office \\
+    Mailing Center/Post Office & \\
+    \midrule
+    Non-Refrigerated Warehouse & Warehouse\\
+    Storage Other than Bldg (OTB) & \\
+    \midrule
+    Other - Services & Service\\
+    Other - Education & Education \\
+    Other - Public Services & Public services \\
+    CT/Office & Courthouse \\
+    All Other & Other \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:building_type_relabel}
+\end{table}
+
+Among the building types, the ``Utility Systems'' buildings act as energy
+suppliers to other buildings. The energy consumption of these buildings are
+dependent on their downstream consumers, thus it is critical to identify these
+power plant buildings and exclude them from the analysis. As is discussed above,
+there are some mis-labelling issues in the building types, for example, the
+DC0001ZZ building, is labeled as ``office'' in all our building type data
+sources, while the building seems to be a heating plant in reality~\cite{dc0001zz2017}.
+To identify mis-labeled power plants, we first collected a set of key words
+suggesting a building is likely to be a power plant from the set of buildings
+already labeled as ``Utility Systems'', and then reclassified other buildings with
+these key words as ``Utility Systems'' as well. The keywords we selected are:
+HEATING TUNNELS, DISTRI TUNNELS, STEAM SERV, POWER PLANT, BOILER PLANT,
+MECHANICAL EQUIPMENT, GENERATOR, PUMPHOUSE, WATER TOWER, HOTA STM, HTG PLT,
+HEATING PLANT, UTLY PLANT, BOILERHOUSE, ELEC SUB STA, PUMP HOUSE, WIND TURBINE,
+GAS METER HOUS, HTG PLNT, PWR PLNT, UTLY PLNT, INCINERATOR, HTG PLANT, HEAT
+PLANT, STANDBY GEN, PLNT, PWR HSE, UTIL PLA.
+
+\subsection{Retrofits}
+The retrofit records are from four excel files acquired from the GSA team:
+``Light-Touch\_M\&V'', ``Portfolio HPGB Dashboard'' and
+``GSAlink\_Buildings\_First\_55'', and ``ScopePortfolioReport\_20160105-7''.
+
+There are 6 types of retrofits related to energy consumption reductions:
+``Advanced Metering'', ``Building Envelope'', ``Building Tuneup or Utility
+Improvements'', ``HVAC'', ``Lighting''. The ``Renewable Energy'', and ``Water''
+type retrofits are left out from the analysis. The ``IEQ'' (indoor environment
+quality) category has the following sub-categories: ``Indoor Daylighting or
+Lighting Strategies'', and ``Thermal Comfort and Ventilation Measures''. We
+split the IEQ retrofits and reclassified the ones with the ``Indoor Daylighting
+or Lighting Strategies'' subcategory into ``Lighting'' retrofits, and the ones
+with ``Thermal Comfort and Ventilation Measures'' categories into the ``HVAC''
+retrofits. The above retrofit types involves modification of the building
+physical environment, and are thus considered capital / hardware retrofit. An
+operational / software retrofit, GSALink is also included in the analysis.
+GSALink is a building fault detection and diagnostics system (FDD)~\cite{intelligentBuildings2019}.
+
+\subsection{Built year}
+The ``Entire GSA Building Portfolio.xls'' file provided to us has a built year
+column, however, as the record uses a two-digit year representation, it is
+unknown which century the built year indicates, thus is not usable. Currently we
+resort to the list of historic buildings~\cite{GSAhistoricBuilding2020}. There
+are 402 historic buildings in the portfolio. Among these buildings, some still
+don't have a record of the built year. The built years among the historic
+buildings with built years ranges from 1809 to 1969, with a mean of 1921.
+
+\subsection{LEED}
+LEED award date and level are retrieved from ~\cite{GBIG2020}. The records here
+are given with building name and address. We match LEED project to building ID
+by their addresses. Some addresses are matched to multiple buildings, we resolve
+this by manually look up building names and see if it matches the project
+description.
+
+\subsection{Building Name} This field is not directly used in the analysis, but
+is used as a secondary field to verify address matches, or confirm building
+types. The source of building names include several excel file from the GSA
+team, including ``Covered\_Facilities\_All\_Energy\_mmBTUs'',
+``FY17WeatherNorm\_CMU\_BldgsOnly'', ``Entire\_GSA\_Building\_Portfolio'',
+``euas\_database\_of\_buildings\_cmu'', ``LEED\_EB\_Building\_totals\_and\_years'',
+``GSAlink\_Buildings\_First\_55\_Opiton\_26\_Start\_Stop\_Dates'', and some file from
+some Github repo~\cite{gsaHackathon2015}.
+
+\subsection{Combining different fields into the retrofit analysis data set}
+
+Following table illustrate the cleaning steps and the remaining records after
+each cleaning step. For step 4, we restricted building types which have more
+than 10 buildings in both retrofitted and non-retrofitted group. We observed
+that after step 5, the leased buildings are only in the non-retrofitted group,
+as a result, we cannot learn retrofit effect for those buildings, thus in step 6
+we restricted the study to owned portfolio. 
+
+\begin{table}[H]
+  \caption{retrofit data joined with monthly consumption}
+  \centering
+  \fontsize{10}{12}\selectfont
+  \begin{tabular}{l|p{5cm}|p{3cm}|p{3cm}}
+    \toprule
+    step & operation & building count &building count\\
+         &           & retrofitted & non-retrofitted\\
+    \midrule
+    0& Initial & 310 & \\
+    1& With energy data & 309 & 2858 \\
+    2& With energy during both pre and post retrofit period & 308 &1155 \\
+    3& With more than 12 months of data for both the pre and post period & 294 & 720 \\
+    4& Building type is office or courthouse & 287 & 529\\
+    5& Building ownership stays the same after the retrofit & 287 & 523\\
+    6& Restrict to owned portfolio & 287 & 296 \\
+    7& Has climate normal & 286 & 296 \\
+    8& Has monthly weather & 286 & 296 \\
+    9& Has three-year pre-retrofit monthly weather & 280 & 287 \\
+    10& Has climate change scenario data& 270 & 282 \\
+    11 & Propensity score above 0.05, below 0.95 & 255 & 274 \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:retrofit_clean}
+\end{table}
+Before the removal of small propensity score data points, we examined the
+average monthly energy consumption for each fuel types.
+
+All coal consumption for the study set are zero, so we disregard the coal
+consumption. The oil consumption are peaking at the right timing but the amount
+of consumption is way larger than normal building consumption. We will not
+consider the oil consumption in our analysis for now.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{../images/retro_avg_monthly_kbtu_OIL_by_building.png}
+  \caption[Oil consumption trend]{Oil consumption for various month of a year}
+  \label{fig:retro_avg_monthly_kbtu_OIL_by_building}
+\end{figure}
+
+There are 15 buildings (20 projects) were awarded LEED over one year before the
+retrofit completion date.
+
+For the retrofitted buildings, we consider the two years prior to the documented
+``Substantial Completion Date'' as the retrofit implementation period, and
+remove them from the analysis. The three-year before the implementation period,
+and the three-year after the ``Substantial Completion Date'' are used to compute
+the outcome variable, the change of average monthly consumption (or consumption
+per sqft). EUAS energy data has only month and year, but not a specific
+duration, we will assume the center of the billing period being the 15th. This
+center date will be used to filter the appropriate pre and post retrofit period
+when joining retrofit time with energy data.
+
+For the non-retrofitted buildings, a pseudo retrofit date is chosen by randomly
+sampling from the actual retrofit dates in the retrofitted buildings, and the pre
+and post period are computed similarly as the retrofitted buildings.
+
+We filtered buildings with at least 12 monthly post retrofit energy data, and
+three year of pre-retrofit data.
+
+For each period, we use the majority of the building category as the category
+for this period. The ties are broken randomly. After checking, this won't affect
+the derived ownership (no ties appear between category C/D or other categories).
+\section{Appendix II: Climate models}
+We used the BCCAv2 output of the following 19 climate models
+
+\begin{table}[H]
+  \caption{Climate models}
+  \centering
+  \fontsize{9}{12}\selectfont
+  \begin{tabular}{lp{8cm}l}
+    \toprule
+Modeling Center& Institution &Model\\
+CSIRO-BOM &CSIRO (Commonwealth Scientific and Industrial Research Organisation,
+Australia) and BOM (Bureau of Meteorology, Australia) & ACCESS1.0 \\
+BCC& Beijing Climate Center, China Meteorological Administration & BCC-CSM1.1 \\
+CCCma & Canadian Centre for Climate Modelling and Analysis & CanESM2 \\
+NCAR & National Center for Atmospheric Research &CCSM4 \\
+NSF-DOE-NCAR & National Science Foundation, Department of Energy, and National Center for Atmospheric Research &CESM1(BGC)\\
+CMCC & Centro Euro-Mediterraneo per I Cambiamenti Climatici & CMCC-CM\\
+CNRM-CERFACS & Centre National de Recherches Meteorologiques/Centre Europeen de
+Recherche et Formation Avancees en Calcul Scientifique & CNRM-CM5\\
+CSIRO-QCCCE & Commonwealth Scientific and Industrial Research Organisation in
+collaboration with the Queensland Climate Change Centre of Excellence & CSIRO-Mk3.6.0 \\
+NOAA GFDL & Geophysical Fluid Dynamics Laboratory & GFDL-ESM2G \\
+          & Geophysical Fluid Dynamics Laboratory & GFDL-ESM2M \\
+INM & Institute for Numerical Mathematics & INM-CM4 \\
+IPSL & Institute Pierre-Simon Laplace & IPSL-CM5A-MR \\
+&& IPSL-CM5B-LR \\
+MIROC & Atmosphere and Ocean Research Institute (The University of Tokyo),
+National Institute for Environmental Studies, and Japan Agency for Marine-Earth
+Science and Technology & MIROC5\\
+MIROC & Japan Agency for Marine-Earth Science and Technology, Atmosphere and
+Ocean Research Institute (The University of Tokyo), and National Institute for
+Environmental Studies & MIROC-ESM \\
+&&MIROC-ESM-CHEM\\ 
+MPI-M & Max Planck Institute for Meteorology (MPI-M) & MPI-ESM-LR\\ 
+&&MPI-ESM-MR\\ 
+MRI & Meteorological Research Institute & MRI-CGCM3\\
+NCC & Norwegian Climate Centre & NorESM1-M \\
+    \bottomrule
+  \end{tabular}
+  \label{tab:climate_models}
+\end{table}
+\newpage
+\bibliographystyle{plain}
+\bibliography{myCitation}
+\end{document}

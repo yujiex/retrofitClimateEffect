@@ -7,7 +7,7 @@ setwd("ion download")
 read.interval <- function (varname) {
   files = list.files(pattern=sprintf("^%s*", varname))
   dflist <- lapply(files, function(f) {
-    readr::read_csv(f, col_types = cols()) %>%
+    readr::read_csv(f, col_types = readr::cols(), guess_max = 1e6) %>%
     dplyr::select(-starts_with("X")) %>%
     tidyr::gather(`building`, !!rlang::sym(varname), -`Timestamp`) %>%
     na.omit() %>%
@@ -76,3 +76,32 @@ for (f in files) {
 }
 
 use_data(energy_15_min)
+
+load("../data/energy_15_min_as_is.rda")
+
+energy_15_min_as_is %>%
+  dplyr::select(Timestamp, building, `kWh usage`) %>%
+  dplyr::mutate(time=as.POSIXct(Timestamp, format=("%m/%d/%Y %H:%M:%S %p"))) %>%
+  dplyr::filter(!is.na(time)) %>%
+  dplyr::group_by(building) %>%
+  dplyr::summarise(start = min(time), end=max(time)) %>%
+  dplyr::ungroup() %>%
+  readr::write_csv("elec_15min_start_end.csv")
+
+## gas
+gas <- read.interval(varname="Natural Gas Vol Int")
+
+length(unique(gas$building))
+
+buildings = unique(gas$building)
+
+lapply(kwh %>%
+       dplyr::slice(1:200000) %>%
+       dplyr::group_by(building) %>%
+       dplyr::group_split() %>%
+       {.}, function(x) {
+       })
+
+gas_15_min_as_is <- gas
+
+usethis::use_data(gas_15_min_as_is)

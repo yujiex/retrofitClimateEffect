@@ -45,7 +45,7 @@ clean.result.check <- function (df) {
 }
 
 clean.result.check(dfallweb)
-## [1] "number of building: 3494, 
+## [1] "number of building: 3494, number of record: 856843"
 
 ## remove records with negative consumption (only electricity consumption has negatives)
 dfallweb <- dfallweb %>%
@@ -55,7 +55,7 @@ dfallweb <- dfallweb %>%
 clean.result.check(dfallweb)
 ## [1] "number of building: 3494, number of record: 856841"
 
-## remove buildings with neither electricity nor gas consumption
+## remove buildings with non of the following types of consumption
 dfallweb.has.data <- dfallweb %>%
   dplyr::rowwise() %>%
   dplyr::mutate(total = sum(KWHRAMT, STEAMAMT, GASAMT, OILAMT, COALAMT, CHILLWTRAMT, na.rm=T)) %>%
@@ -103,6 +103,7 @@ energy_monthly_web <- dfallweb.has.data %>%
   {.}
 
 clean.result.check(energy_monthly_web)
+## [1] "number of building: 3271, number of record: 556110"
 
 energy_monthly_web <- energy_monthly_web %>%
   dplyr::left_join(building.state, by=c("BLDGNUM")) %>%
@@ -110,8 +111,6 @@ energy_monthly_web <- energy_monthly_web %>%
   {.}
 
 clean.result.check(energy_monthly_web)
-
-load("../data/energy_monthly_web.rda")
 
 usethis::use_data(energy_monthly_web, overwrite = T)
 
@@ -159,15 +158,17 @@ clean.result.check(energy_monthly_web_withloc)
 
 usethis::use_data(energy_monthly_web_withloc, overwrite = T)
 
+load("../data/energy_monthly_web_withloc.rda")
+
 energy_monthly_web_continental <- energy_monthly_web_withloc %>%
   dplyr::filter(!STATE %in% c("AK", "HI", "VI", "GU", "PR", "VI", "MP")) %>%
   {.}
 
-clean.result.check(energy_monthly_web_continental)
+clean.result.check(energy_monthly_web_withloc)
 
 load("../data/energy_monthly_web_withloc.rda")
 
-energy_90_to_18 = energy_monthly_web_withloc %>%
+energy_90_to_18 = energy_monthly_web_continental %>%
   dplyr::arrange(BLDGNUM, FYR, FMONTH) %>%
   dplyr::filter(FYR >= 1990, FYR <=2018) %>%
   dplyr::group_by(BLDGNUM) %>%
@@ -175,6 +176,6 @@ energy_90_to_18 = energy_monthly_web_withloc %>%
   dplyr::ungroup() %>%
   {.}
 
-usethis::use_data(energy_90_to_18)
+clean.result.check(energy_90_to_18)
 
-load("../data/ghcnd_data_full.rda")
+usethis::use_data(energy_90_to_18)

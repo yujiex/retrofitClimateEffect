@@ -23,6 +23,7 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{pdflscape}
+\usepackage{float}
 % \usepackage{minted}
 % \usepackage{natbib}
 % \usepackage{apacite} 
@@ -74,9 +75,33 @@ Fields
 \end{itemize}
 
 We'll assume buildings in category C or D are leased, others are owned
-\section{Title}
 
-\section{Retrofits}
+\subsection{Building Type}
+Building types affects when and how buildings are operated, thus affecting its
+energy consumption pattern. It also might impact some other physical aspects of
+the building, and its retrofit decisions. In the GSA data set, there are 4
+different sources of building types, one from Energy Star Portfolio Manager, one
+from a excel file sent to us by the GSA team, and the 2012 and 2014 EPA National
+Building Competition records from online sources.
+
+Among these sources, many have disagreement on what type a building belongs to.
+We first removed the type called ``Other'' and ``All other'', as these labels
+provides no type information. Secondly, we have noticed that ``Office'' seems to
+be used as a default type, and the name of some buildings suggest they are of a
+different category. For example, we've seen parking lots, and heating plants
+labeled as offices. As a result, when we see a building with multiple type
+labels, we will give higher priority to other types labels. For example, when a
+building is labeled warehouse and office, we'll consider it to be warehouse.
+
+Among the building types, the ``Utility Systems'' are those acting as power
+plants. The energy consumption of these buildings are dependent on their
+downstream consumers, thus will be removed from the analysis. To identify
+mis-labeled power plants, we first collected a set of key words suggesting a
+building is likely to be a power plant from the set of buildings already labeled
+``Utility Systems'', and then reclassified other buildings with these key words
+as ``Utility Systems'' as well.
+
+\subsection{Retrofits}
 The retrofit records are from three sources: xx and xx
 
 EUAS energy data has only month and year, but not a specific duration, we will
@@ -93,6 +118,112 @@ consumption (or consumption per sqft).
 For the non-retrofitted buildings, a fake retrofit date is chosen from a random
 sample of the actual retrofit dates in the retrofitted buildings, and the pre
 and post period are computed similarly as the retrofitted buildings.
+
+We filtered buildings with at least 12 monthly energy data, and with an average
+of non-zero consumption. Then we restricted the study to buildings whose types
+appear in both the retrofitted and un-retrofitted group for at least 10 times.
+This leaves us with the office and courthouses.
+
+For each period, we use the majority of the building category as the category
+for this period. The ties are broken randomly. After checking, this won't affect
+the derived ownership (no ties appear between category C/D or other categories).
+
+Building type is from the file called ``Entire GSA Building Portfolio.xls''.
+After a matching step, there are 128 buildings with known built year, 489 with
+unknown century (as the year is recorded with two digits, so for some records,
+it's possible to be 19xx or 20xx), and 846 unknown. Gave up on getting the built
+year information for now.
+
+May be able to get the list of historic buildings from \url{https://www.gsa.gov/node/95?actionParameter=displayAllBuildings&buildingVO.searchBy=CITY&state.id=0&__multiselect_selectedCities=&__multiselect_selectedBuildings=&buildingNos=AK0001ZZ&buildingNos=AK0005AK&buildingNos=AK0013ZZ&buildingNos=AK0022ZZ&__multiselect_buildingNos=&__multiselect_selectedArchiects=&buildingVO.buildingType.id=-1&buildingVO.yearBegin=&buildingVO.yearFinish=}.
+
+LEED award date and level are retrieved from points are retrieved from
+\url{http://www.gbig.org/collections/14796/buildings?page=1} for quality control
+(even if there are other LEED data files given to us previously).
+
+We match LEED project by address. Some addresses are matched to multiple
+buildings, we resolve this by manually look up building names and see if it
+matched the project description. The building name lookup file is from \url{https://raw.githubusercontent.com/Sreeramk/gsa-hackathon-t4/master/Data/costs.csv}
+
+\section{Weather}
+The daily min and max temperature, and daily precipitation are downloaded from NOAA using R package rnoaa.
+\subsection{Daily temperature}
+
+HI0011ZZ cannot find nearby stations within 20km radius.
+
+when restricting a 36 months pre-retrofit energy, we are left with 280 retrofitted
+and 283 un-retrofitted buildings. If not filter, we have 286 retrofitted and 291 non-retrofitted.
+
+The bin representation of 10 degree bins are used.
+
+\subsection{Daily precipitation}
+The bin temperature with 5mm width are used.
+
+\section{Climate}
+We will produce an estimate of each individual model, and a weighted average of
+all model estimates using the weights from Sanderson and Wehner (cite) table B.2.
+
+The climate data of daily min and daily max temperature (tmin and tmax) for the
+duration of 2090-2099 is downloaded from the bias corrected downscaled climate
+scenario daily data (BCCA) of various climate models and runs from the CMIP5
+multi-model ensemble archive. The data has a spatial resolution of 1/8 degrees.
+
+The NEX-GDDP dataset has a resolution of 0.25 degrees, so I used the bcca data
+set with finer spatial resolution.
+
+The continental US region climate data are downloaded from
+\url{https://gdo-dcp.ucllnl.org/downscaled_cmip_projections/dcpInterface.html#Projections:%20Subset%20Request}.
+Following is a visualization of the grid points of one time snapshot of one
+model. 20 models of mid and end century data are downloaded.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{../images/climate_scenario_grid_us.png}
+  \caption[daily max temperature grid]{Daily max temperature of one model one
+    day for the whole US}
+  \label{fig:climate_scenario_grid_us}
+\end{figure}
+
+The following is a zoomed-in plot of a sub-region.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.6\textwidth]{../images/zoomed_climate_scenario_grid_us.png}
+  \caption[daily max temperature grid]{Daily max temperature of one model one
+    day for Pennsylvania}
+  \label{fig:zoomed_climate_scenario_grid_us}
+\end{figure}
+
+We downloaded 19 models for RCP45 and RCP85 for three different period:
+2011-2014, 2050-2099, and 2090-2099. The models are present in all scenarios and period.
+
+The following 13 buildings have
+no data as a result of failure in interpolation: TX1979ZZ, WA7546ZZ, FL0019ZZ,
+FL2917ZZ, FL3150ZZ, MA0134ZZ, MA5311ZZ, MA5780ZZ, MI1657ZZ, OH0192ZZ, TX0079ZZ,
+TX0080ZZ, TX0081ZZ
+
+Among the retrofit data set, three buildings don't have the cmip5 climate
+scenario data, as they are at the edge or outside of the continental US, thus
+the interpolation failed.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{../images/retrofit_cmip5_loc.png}
+  \caption[cmip5 availability for retrofit data set]{Climate scenario data
+    availability for the retrofit data set}
+  \label{fig:retrofit_cmip5_loc}
+\end{figure}
+
+
+Note that some buildings share the same latitude and longitude location.
+\section{Plots}
+The post-retrofit average monthly consumption seems lower than that of the
+pre-retrofit period.
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\textwidth]{../images/diff_mean_energy.png}
+  \caption{Difference in average monthly consumption}
+\end{figure}
+
+Comparing the retrofitted and the non-retrofitted, the pre and post consumption.
 
 \newpage
 \bibliographystyle{plain}

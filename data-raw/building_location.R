@@ -108,6 +108,11 @@ building.latlon <- got.result %>%
   dplyr::bind_rows(third.result) %>%
   {.}
 
+building.latlon %>%
+  dplyr::group_by(datasource) %>%
+  dplyr::summarise(n()) %>%
+  dplyr::ungroup()
+
 building_location <- building.latlon
 
 usethis::use_data(building_location, overwrite = T)

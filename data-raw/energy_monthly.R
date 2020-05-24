@@ -68,6 +68,39 @@ df = df.amt %>%
 clean.result.check(df)
 ## [1] "number of building: 3494, number of record: 6166413"
 
+energy.raw = df
+
+usethis::use_data(energy.raw, overwrite = T)
+
+load("../data/energy.raw.rda")
+
+energy.raw %>%
+  dplyr::group_by(FYR, BLDGNUM, variable) %>%
+  dplyr::summarise(amt = sum(amt)) %>%
+  dplyr::filter(amt > 0) %>%
+  dplyr::filter(FYR == 2018) %>%
+  dplyr::distinct(BLDGNUM) %>%
+  {.}
+
+## get the building size for all buildings in the data set
+area.cat <- readxl::read_excel("mar.fyrbuilding.xlsx") %>%
+  {.}
+
+building_sqft_category_region_raw <- df %>%
+  dplyr::distinct(BLDGNUM, FYR) %>%
+  dplyr::arrange(BLDGNUM, FYR) %>%
+  dplyr::left_join(area.cat, by=c("BLDGNUM", "FYR")) %>%
+  dplyr::group_by(BLDGNUM) %>%
+  dplyr::arrange(FYR) %>%
+  tidyr::fill(GROSSSQFT, BLDGCAT, REGNNUM) %>%
+  tidyr::fill(GROSSSQFT, BLDGCAT, REGNNUM, .direction = "up") %>%
+  dplyr::ungroup() %>%
+  dplyr::select(BLDGNUM, FYR, GROSSSQFT, BLDGCAT, REGNNUM) %>%
+  na.omit() %>%
+  {.}
+
+usethis::use_data(building_sqft_category_region_raw, overwrite = T)
+
 ## remove negative consumption
 df <- df %>%
   dplyr::filter(amt >= 0) %>%
@@ -76,14 +109,34 @@ df <- df %>%
 clean.result.check(df)
 ## [1] "number of building: 3494, number of record: 6166411"
 
-## Has non-zero energy consumption of in a fiscal year
+## For each fuel type of a building in each fiscal year, if the total consumption of
+## the fiscal year is 0, remove the whole year of data
 df <- df %>%
-  dplyr::group_by(FYR, BLDGNUM) %>%
-  dplyr::filter(sum(amt[!(variable %in% c("WTR", "KWDMD"))]) > 0) %>%
+  dplyr::group_by(FYR, BLDGNUM, variable) %>%
+  dplyr::filter(sum(amt) > 0) %>%
   dplyr::ungroup() %>%
   {.}
 
 clean.result.check(df)
+## [1] "number of building: 3274, number of record: 1181741"
+
+## remove water data
+df <- df %>%
+  ## not analyzing water data
+  dplyr::filter(variable != "WTR") %>%
+  {.}
+
+clean.result.check(df)
+## [1] "number of building: 3271, number of record: 1062104"
+
+## Has non-zero energy consumption of in a fiscal year (this is an older version, less strict)
+## df <- df %>%
+##   dplyr::group_by(FYR, BLDGNUM) %>%
+##   dplyr::filter(sum(amt[!(variable %in% c("WTR", "KWDMD"))]) > 0) %>%
+##   dplyr::ungroup() %>%
+##   {.}
+
+## clean.result.check(df)
 ## [1] "number of building: 3271, number of record: 3790044"
 
 ## according to mar.unitconversions.csv
@@ -114,12 +167,11 @@ building.state = readxl::read_excel("mar.facilitybuildings.xlsx") %>%
 ##   nrow()
 
 df <- df %>%
-  dplyr::left_join(building.state, by=c("BLDGNUM")) %>%
-  dplyr::filter(!is.na(STATE)) %>%
+  dplyr::inner_join(building.state, by=c("BLDGNUM")) %>%
   {.}
 
 clean.result.check(df)
-## [1] "number of building: 3253, number of record: 3787186"
+## [1] "number of building: 3253, number of record: 1060939"
 
 area.cat <- readxl::read_excel("mar.fyrbuilding.xlsx") %>%
   {.}
@@ -139,19 +191,18 @@ building_sqft_category_region <- df %>%
 usethis::use_data(building_sqft_category_region, overwrite = T)
 
 df <- df %>%
-  dplyr::left_join(building_sqft_category_region, by=c("BLDGNUM", "FYR")) %>%
-  dplyr::filter(!is.na(GROSSSQFT)) %>%
+  dplyr::inner_join(building_sqft_category_region, by=c("BLDGNUM", "FYR")) %>%
   {.}
 
 clean.result.check(df)
-## [1] "number of building: 3248, number of record: 3785739"
+## [1] "number of building: 3253, number of record: 1060939"
 
 df <- df %>%
   dplyr::filter(GROSSSQFT > 1) %>%
   {.}
 
 clean.result.check(df)
-## [1] "number of building: 3181, number of record: 3743895"
+## [1] "number of building: 3182, number of record: 1171637"
 
 energy_monthly_web <- df
 
@@ -163,17 +214,17 @@ energy_monthly_web_withloc <- energy_monthly_web %>%
   dplyr::filter(BLDGNUM %in% unique(building_location$BLDGNUM)) %>%
   {.}
 
-usethis::use_data(energy_monthly_web_withloc, overwrite = T)
-
 clean.result.check(energy_monthly_web_withloc)
-## [1] "number of building: 3167, number of record: 3737446"
+## [1] "number of building: 3167, number of record: 1050388"
+
+usethis::use_data(energy_monthly_web_withloc, overwrite = T)
 
 energy_monthly_web_continental <- energy_monthly_web_withloc %>%
   dplyr::filter(!STATE %in% c("AK", "HI", "VI", "GU", "PR", "VI", "MP")) %>%
   {.}
 
 clean.result.check(energy_monthly_web_continental)
-## [1] "number of building: 3058, number of record: 3624165"
+## [1] "number of building: 3058, number of record: 1027178"
 
 usethis::use_data(energy_monthly_web_continental, overwrite = T)
 
@@ -188,6 +239,6 @@ energy_90_to_18 =
   {.}
 
 clean.result.check(energy_90_to_18)
+## [1] "number of building: 499, number of record: 173652"
 
 usethis::use_data(energy_90_to_18, overwrite = T)
-
