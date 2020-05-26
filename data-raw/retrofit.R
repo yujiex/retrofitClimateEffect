@@ -63,7 +63,8 @@ retrofit_from_db = db.interface::read_table_from_db(dbname = "all", tablename = 
   dplyr::mutate(Substantial_Completion_Date = gsub("/", "-", Substantial_Completion_Date)) %>%
   dplyr::mutate(Substantial_Completion_Date = gsub(" 00:00:00", "", Substantial_Completion_Date)) %>%
   dplyr::mutate(Substantial_Completion_Date = as.POSIXct(`Substantial_Completion_Date`)) %>%
-  dplyr::mutate(top_level_ECM = ifelse(high_level_ECM %in% c("Advanced Metering", "GSALink", "Building Tuneup or Utility Improvements"), "Capital", "Operational")) %>%
+  ## dplyr::mutate_at(vars(high_level_ECM), recode, "Building Tuneup or Utility Improvements"="Commissioning") %>%
+  dplyr::mutate(top_level_ECM = ifelse(high_level_ECM %in% c("Advanced Metering", "GSALink", "Building Tuneup or Utility Improvements"), "Operational", "Capital")) %>%
   {.}
 
 db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_ecm") %>%
@@ -80,38 +81,88 @@ clean.result.check(retrofit_from_db, "Building_Number")
 
 usethis::use_data(retrofit_from_db, overwrite = T)
 
+retro_long_detail = retrofit_from_db %>%
+  dplyr::distinct(`Building_Number`, Substantial_Completion_Date, high_level_ECM, detail_level_ECM) %>%
+  dplyr::arrange(`Building_Number`, Substantial_Completion_Date, high_level_ECM, detail_level_ECM) %>%
+  tidyr::unite("high.and.detail", high_level_ECM:detail_level_ECM) %>%
+  {.}
+
 retro_long = retrofit_from_db %>%
   dplyr::distinct(`Building_Number`, Substantial_Completion_Date, high_level_ECM) %>%
   dplyr::arrange(`Building_Number`, Substantial_Completion_Date, high_level_ECM) %>%
   {.}
 
+retro_long_toplevel = retrofit_from_db %>%
+  dplyr::distinct(`Building_Number`, Substantial_Completion_Date, top_level_ECM) %>%
+  dplyr::arrange(`Building_Number`, Substantial_Completion_Date, top_level_ECM) %>%
+  dplyr::group_by(`Building_Number`, Substantial_Completion_Date) %>%
+  dplyr::summarise(top_level_ECM = paste(top_level_ECM, collapse = " and ")) %>%
+  dplyr::ungroup() %>%
+  {.}
+
+## joint-action high-level
+retro_long_joint_highlevel = retro_long %>%
+  dplyr::arrange(Building_Number, `Substantial_Completion_Date`, high_level_ECM) %>%
+  dplyr::group_by(Building_Number, `Substantial_Completion_Date`) %>%
+  dplyr::summarise(joint.highlevel = paste(high_level_ECM, collapse = " and ")) %>%
+  dplyr::ungroup() %>%
+  {.}
+
 clean.result.check(retro_long, "Building_Number")
 ## [1] "number of building: 310, number of record: 940"
 
-dfs = retro_long %>%
-  dplyr::group_split(high_level_ECM) %>%
-  {.}
+options(tibble.width=Inf)
 
-result = lapply(dfs, function(x) {
-  action = x$high_level_ECM[[1]]
-  wide = x %>%
-    dplyr::select(-high_level_ECM) %>%
-    dplyr::rename(target.date = `Substantial_Completion_Date`) %>%
-    dplyr::left_join(retro_long, by=c("Building_Number")) %>%
-    dplyr::mutate(prev.action=as.numeric(`Substantial_Completion_Date` <= target.date)) %>%
-    dplyr::select(-`Substantial_Completion_Date`) %>%
-    tidyr::spread(high_level_ECM, prev.action, fill=0) %>%
-    dplyr::mutate(!!rlang::sym(action) := 0) %>%
-    dplyr::mutate(target.action = action) %>%
-    dplyr::select(`Building_Number`, target.action, target.date, everything()) %>%
+## get previous action for top level
+get.prev.action <- function (data, colname) {
+  dfs = data %>%
+    dplyr::group_split(!!rlang::sym(colname)) %>%
     {.}
-})
+  result = lapply(dfs, function(x) {
+    action = x[[colname]][[1]]
+    print(action)
+    wide = x %>%
+      dplyr::select(-one_of(colname)) %>%
+      dplyr::rename(target.date = `Substantial_Completion_Date`) %>%
+      dplyr::left_join(data, by=c("Building_Number")) %>%
+      ## pre or co-existing actions
+      dplyr::mutate(prev.action=as.numeric((`Substantial_Completion_Date` < target.date) |
+                                           ((`Substantial_Completion_Date` == target.date) & (!!rlang::sym(colname) != action)))) %>%
+      dplyr::select(-`Substantial_Completion_Date`) %>%
+      dplyr::distinct() %>%
+      ## keep the ones with no prev action, and the ones with any prev action
+      dplyr::group_by(`Building_Number`, target.date) %>%
+      dplyr::filter(sum(prev.action) == 0 | prev.action == 1) %>%
+      dplyr::ungroup() %>%
+      tidyr::spread(!!rlang::sym(colname), prev.action, fill=0) %>%
+      dplyr::mutate(target.action = action) %>%
+      dplyr::select(`Building_Number`, target.action, target.date, everything()) %>%
+      dplyr::arrange(`Building_Number`, target.action, target.date) %>%
+      {.}
+  })
+  retrofit_prev_actions = dplyr::bind_rows(result) %>%
+    replace(is.na(.), 0) %>%
+    {.}
+  return(retrofit_prev_actions)
+}
 
-retrofit_prev_actions = dplyr::bind_rows(result) %>%
-  {.}
+## single high-level
+retrofit_prev_actions_highlevel = get.prev.action(data=retro_long, colname="high_level_ECM")
+usethis::use_data(retrofit_prev_actions_highlevel, overwrite = T)
 
-usethis::use_data(retrofit_prev_actions, overwrite = T)
+## joint high-level
+retrofit_prev_actions_joint_highlevel = get.prev.action(data=retro_long_joint_highlevel, colname="joint.highlevel")
+usethis::use_data(retrofit_prev_actions_joint_highlevel, overwrite = T)
 
+## capital vs operational (top-level)
+retrofit_prev_actions_toplevel = get.prev.action(data=retro_long_toplevel, colname="top_level_ECM")
+usethis::use_data(retrofit_prev_actions_toplevel, overwrite = T)
+
+## single detail-level
+retrofit_prev_actions_detaillevel = get.prev.action(data=retro_long_detail, colname="high.and.detail")
+usethis::use_data(retrofit_prev_actions_detaillevel, overwrite = T)
+
+load("../data/retrofit.alldata.rda")
 load("../data/energy_monthly_web_withloc.rda")
 
 ## 6 months implementation time for these buildings and gsalink
