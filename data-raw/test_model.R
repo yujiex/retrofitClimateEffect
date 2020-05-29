@@ -1,5 +1,6 @@
 library("dplyr")
 library("grf")
+library("ggplot2")
 
 ## load("../data/retrofit.alldata.rda")
 ## load("../data/retrofit.alldata.highprop.rda")
@@ -26,7 +27,10 @@ dfs.cmip5 = cmip5.bin.period %>%
 ## prev.action: df with previous action
 ## fuel.and.other: df with other fields
 ## kw: key words in file naming
-fit.cf <- function(prev.action, fuel.and.other, kw) {
+fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
+  if (bound.propensity) {
+    kw = paste0(kw, "_bp")
+  }
   dfs.by.action = prev.action %>%
     dplyr::group_by(target.action) %>%
     dplyr::group_split() %>%
@@ -57,7 +61,15 @@ fit.cf <- function(prev.action, fuel.and.other, kw) {
         {.}
       Y = df.allfeature$eui.diff
       W = df.allfeature$is.real.retrofit
-      c.forest <- grf::causal_forest(X, Y, W)
+      c.forest.initial <- grf::causal_forest(X, Y, W)
+      ## bound treatment probability
+      if (bound.propensity) {
+        W.hat.initial <- c.forest.initial$W.hat
+        W.hat.bounded = ifelse(W.hat.initial > 0.95, 0.95, ifelse(W.hat.initial < 0.05, 0.05, W.hat.initial))
+        c.forest <- grf::causal_forest(X, Y, W, W.hat=W.hat.bounded)
+      } else {
+        c.forest = c.forest.initial
+      }
       c.pred <- predict(c.forest, estimate.variance = T)
       ## plot importance
       importance = variable_importance(c.forest)
