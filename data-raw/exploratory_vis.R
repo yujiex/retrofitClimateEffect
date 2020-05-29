@@ -1096,7 +1096,10 @@ retrofit.alldata.highprop %>%
 ggplot2::ggsave(sprintf("%s/retrofit_climate_scenario_%s_nofacet.png", imagedir, scenario.to.plot), width=6, height=4)
 
 ## plot regression result causal forest
-cf.result = readr::read_csv(sprintf("%s/grf_result.csv", tabledir))
+## kw = "toplevel_bp"
+## kw = "highlevel_bp"
+kw = "detaillevel_bp"
+cf.result = readr::read_csv(sprintf("%s/grf_result_%s.csv", tabledir, kw))
 
 cf.result.significant = cf.result %>%
   dplyr::mutate(ci.low = predictions - variance.estimates,
@@ -1104,18 +1107,12 @@ cf.result.significant = cf.result %>%
   dplyr::filter(sign(ci.low) == sign(ci.high)) %>%
   {.}
 
-cf.result %>%
-  dplyr::distinct(BLDGNUM, is.real.retrofit, Substantial_Completion_Date, action) %>%
-  dplyr::filter(action == "GSALink") %>%
-  dplyr::group_by(is.real.retrofit) %>%
-  dplyr::count() %>%
-  dplyr::ungroup() %>%
-  {.}
-
 ## plot savings against sqft
+action.to.plot = "HVAC"
+## action.to.plot = "Capital"
 cf.result %>%
   dplyr::filter(!is.real.retrofit) %>%
-  dplyr::filter(action=="HVAC") %>%
+  dplyr::filter(action==action.to.plot) %>%
   dplyr::group_by(BLDGNUM, Substantial_Completion_Date, is.real.retrofit, GROSSSQFT) %>%
   dplyr::summarise(predictions = sum(predictions)) %>%
   dplyr::ungroup() %>%
@@ -1137,6 +1134,7 @@ df.label = cf.result %>%
   {.}
 
 ## annual
+## for overall action
 cf.result %>%
   dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
                   "Building Tuneup or Utility Improvements"="Commissioning") %>%
@@ -1146,8 +1144,6 @@ cf.result %>%
                                          "With retrofit",
                                          "Without retrofit")) %>%
   dplyr::filter(`retrofit.label`=="With retrofit") %>%
-    ## ggplot2::ggplot(ggplot2::aes(x=predictions, fill=retrofit.label,
-    ##                              group=interaction(retrofit.label, action, fuel))) +
   ## annual
   dplyr::mutate(predictions = (-1)*predictions * 12) %>%
   ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
@@ -1157,8 +1153,8 @@ cf.result %>%
   ggplot2::facet_grid(fuel ~ action) +
   ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
   ggplot2::geom_text(size=3, data = df.label,
-                     mapping=ggplot2::aes(x = -Inf, y = Inf, label=action.label),
-                     hjust = -0.2, vjust = 1.5) +
+                     mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
+                     hjust = -0.5, vjust = 1.2) +
   ggplot2::theme_bw() +
   ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
   ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
@@ -1167,7 +1163,69 @@ cf.result %>%
   ggplot2::theme(legend.position="bottom",
                  axis.text.x = element_text(size=6),
                  strip.text.x = element_text(size = 7))
-ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides.png", imagedir), width=8, height=4)
+if (kw == "highlevel_bp") {
+  image.width = 8
+} else if (kw == "toplevel_bp") {
+  image.width = 6
+}
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_%s.png", imagedir, kw), width=image.width, height=4)
+
+if (stringr::str_detect(kw, "detaillevel")) {
+  ## for detailed action pairs
+  dfs.detailed.action = df.label %>%
+    dplyr::filter(n>20) %>%
+    tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
+    dplyr::filter(l2 != "NA") %>%
+    dplyr::group_by(l1, l3, fuel) %>%
+    dplyr::filter(n()>1) %>%
+    dplyr::ungroup() %>%
+    dplyr::arrange(l1, l3, l2) %>%
+    dplyr::group_by(l1, l3) %>%
+    dplyr::group_split() %>%
+    {.}
+  lapply(dfs.detailed.action, function(action.to.plot) {
+    ## for overall action
+    image.suf <- paste(action.to.plot$l1[[1]], action.to.plot$l3[[1]], sep= "_")
+    print(image.suf)
+    df.label <- action.to.plot %>%
+      tidyr::unite("action", l2:l3) %>%
+      dplyr::mutate(action = gsub("_NA", "", action)) %>%
+      {.}
+    cf.result %>%
+      dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                       "Building Tuneup or Utility Improvements"="Commissioning") %>%
+      dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
+                       "GAS"="Gas", "KWHR"="Electricity") %>%
+      dplyr::filter(is.real.retrofit==1) %>%
+      tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
+      dplyr::inner_join(action.to.plot, by=c("l1", "l2", "l3", "fuel")) %>%
+      tidyr::unite("action", l2:l3) %>%
+      ## annual
+      dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+      dplyr::mutate(action = gsub("_NA", "", action)) %>%
+      ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
+      ggplot2::geom_density(alpha=0.3, fill="grey") +
+      ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+      ggplot2::geom_rug() +
+      ggplot2::facet_grid(fuel ~ action) +
+      ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
+      ggplot2::geom_text(size=3, data =df.label,
+                        mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
+                        hjust = -0.5, vjust = 1.2) +
+      ggplot2::theme_bw() +
+      ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
+      ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+      ggplot2::ylab("Probability density") +
+      ggplot2::coord_flip() +
+      ggplot2::theme(legend.position="bottom",
+                     axis.text.x = element_text(size=6),
+                     strip.text.x = element_text(size = 7),
+                     plot.title = element_text(size = 12))
+    ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s.png", imagedir, kw, image.suf),
+                    width=4, height=4)
+    return(NULL)
+  })
+}
 
 ## in document
 cf.result %>%
