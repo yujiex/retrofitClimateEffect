@@ -73,7 +73,7 @@ db.interface::read_table_from_db(dbname = "all", tablename = "EUAS_ecm") %>%
   dplyr::arrange(Building_Number, high_level_ECM, source_highlevel) %>%
   ## dplyr::distinct(Building_Number, high_level_ECM,  Substantial_Completion_Date) %>%
   dplyr::filter(is.na(Substantial_Completion_Date)) %>%
-  distinct( source_highlevel) %>%
+  distinct(source_highlevel) %>%
   {.}
 
 clean.result.check(retrofit_from_db, "Building_Number")
@@ -680,12 +680,51 @@ retrofit.energy %>%
   dplyr::distinct(BLDGNUM, Year) %>%
   readr::write_csv("need_to_download.csv")
 
-retrofit.weather = retrofit.energy %>%
+retrofit.weather.measure = retrofit.energy %>%
   dplyr::distinct(BLDGNUM, Substantial_Completion_Date, Year, Month, time, retro.status, is.real.retrofit) %>%
   dplyr::arrange(BLDGNUM, Substantial_Completion_Date, Year, Month) %>%
   dplyr::filter(BLDGNUM %in% unique(retrofit.avg.energy.enough.data$BLDGNUM)) %>%
   dplyr::left_join(df.weather.retro.bin, by=c("BLDGNUM"="building", "Year"="year", "Month"="month")) %>%
   dplyr::left_join(df.weather.retro.dd, by=c("BLDGNUM"="building", "Year"="year", "Month"="month")) %>%
+  dplyr::mutate(model="measured", scenario="measured") %>%
+  {.}
+
+library("feather")
+
+monthly.climate.projection = feather::read_feather("../data/cmip5_concat.feather") %>%
+  tibble::as_tibble() %>%
+  {.}
+
+load("../data/building_location.rda")
+building_location <- building_location %>%
+  dplyr::select(BLDGNUM, Latitude, Longitude) %>%
+  dplyr::mutate(Longitude360=Longitude %% 360) %>%
+  {.}
+
+projected.weather.now = monthly.climate.projection %>%
+  dplyr::filter(period == "2005Jan through 2019Jan") %>%
+  dplyr::left_join(building_location,
+                   by=c("lat.pts"="Latitude", "lon.pts"="Longitude360")) %>%
+  dplyr::mutate(Year=as.numeric(year), Month=as.numeric(month)) %>%
+  dplyr::filter(Missing == 0) %>%
+  dplyr::select(-lat.pts, -lon.pts, -year, -month, -Missing, -folder, -file, -Longitude, -period) %>%
+  {.}
+
+retrofit.weather.projected = retrofit.energy %>%
+  dplyr::distinct(BLDGNUM, Substantial_Completion_Date, Year, Month, time, retro.status, is.real.retrofit) %>%
+  dplyr::arrange(BLDGNUM, Substantial_Completion_Date, Year, Month) %>%
+  dplyr::filter(BLDGNUM %in% unique(retrofit.avg.energy.enough.data$BLDGNUM)) %>%
+  dplyr::left_join(projected.weather.now, by=c("BLDGNUM", "Year", "Month")) %>%
+  na.omit() %>%
+  ## this model is not in rcp45
+  dplyr::filter(model != "gfdl-cm3.1") %>%
+  {.}
+
+retrofit.weather = retrofit.weather.measure %>%
+  dplyr::bind_rows(retrofit.weather.projected) %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, Year, Month) %>%
+  dplyr::filter(n() > 1) %>%
+  dplyr::ungroup() %>%
   {.}
 
 retrofit.weather %>%
@@ -695,16 +734,16 @@ retrofit.weather %>%
   dplyr::ungroup()
 ## is.real.retrofit `n()`
 ## <lgl>            <int>
-## 1 FALSE              296
-## 2 TRUE               286
+## 1 FALSE              291
+## 2 TRUE               276
 
 usethis::use_data(retrofit.weather, overwrite = T)
 
 building.with.36month.pre.weather = retrofit.weather %>%
+  dplyr::filter(retro.status == "pre") %>%
   dplyr::group_by(BLDGNUM, Substantial_Completion_Date, retro.status, is.real.retrofit) %>%
-  dplyr::summarise(n()) %>%
+  dplyr::filter(n()==36 * (19 * 2 + 1)) %>%
   dplyr::ungroup() %>%
-  dplyr::filter(retro.status == "pre", `n()`==36) %>%
   dplyr::distinct(BLDGNUM, Substantial_Completion_Date) %>%
   {.}
 
@@ -719,14 +758,14 @@ retrofit.36month.pre.weather %>%
   dplyr::ungroup()
 ## is.real.retrofit `n()`
 ## <lgl>            <int>
-## 1 FALSE              287
-## 2 TRUE               280
+## 1 FALSE              282
+## 2 TRUE               270
 
 usethis::use_data(building.with.36month.pre.weather, overwrite = T)
 
 retrofit.36month.pre.weather.summary <- retrofit.36month.pre.weather %>%
   dplyr::select(-Year, -Month, -time) %>%
-  dplyr::group_by(BLDGNUM, Substantial_Completion_Date, retro.status, is.real.retrofit) %>%
+  dplyr::group_by(BLDGNUM, Substantial_Completion_Date, retro.status, is.real.retrofit, model, scenario) %>%
   dplyr::summarise_all(function(x) {sum(x) / 3}) %>%
   dplyr::ungroup() %>%
   {.}
@@ -741,18 +780,10 @@ retrofit.alldata %>%
   dplyr::group_by(is.real.retrofit) %>%
   dplyr::summarise(n()) %>%
   dplyr::ungroup()
-
-load("../data/cmip5.bin.period.rda")
-
-retrofit.alldata <- retrofit.alldata %>%
-  dplyr::filter(BLDGNUM %in% unique(cmip5.bin.period$BLDGNUM)) %>%
-  {.}
-
-retrofit.alldata %>%
-  dplyr::distinct(BLDGNUM, is.real.retrofit) %>%
-  dplyr::group_by(is.real.retrofit) %>%
-  dplyr::summarise(n()) %>%
-  dplyr::ungroup()
+## is.real.retrofit `n()`
+## <lgl>            <int>
+## 1 FALSE              282
+## 2 TRUE               270
 
 usethis::use_data(retrofit.alldata, overwrite = T)
 
