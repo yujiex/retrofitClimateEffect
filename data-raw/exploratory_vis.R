@@ -970,6 +970,11 @@ now.weather %>%
   ggplot2::theme(legend.position="bottom")
 ggsave(sprintf("%s/now_mid_century_bin_bar.png", imagedir), width=6, height=4)
 
+## plot the distribution of each bin
+now.weather %>%
+  dplyr::bind_rows(midcentury.weather) %>%
+  {.}
+
 ## 2 bars per bin
 now.weather %>%
   dplyr::bind_rows(midcentury.weather) %>%
@@ -1098,9 +1103,9 @@ ggplot2::ggsave(sprintf("%s/retrofit_climate_scenario_%s_nofacet.png", imagedir,
 ## plot regression result causal forest
 ## kw = "toplevel_bp"
 ## kw = "highlevel_bp"
-## kw = "detaillevel_bp"
-kw = "joint_highlevel_bp"
-cf.result = readr::read_csv(sprintf("%s/grf_result_%s.csv", tabledir, kw))
+kw = "detaillevel_bp"
+## kw = "joint_highlevel_bp"
+cf.result = readr::read_csv(sprintf("%s/grf_result_fewcol_%s.csv", tabledir, kw))
 
 cf.result.significant = cf.result %>%
   dplyr::mutate(ci.low = predictions - variance.estimates,
@@ -1123,7 +1128,9 @@ cf.result %>%
   ggplot2::theme()
 
 df.label = cf.result %>%
+  dplyr::filter(period == "now") %>%
   dplyr::filter(is.real.retrofit==1) %>%
+  dplyr::distinct(action, fuel, BLDGNUM, Substantial_Completion_Date) %>%
   dplyr::group_by(action, fuel) %>%
   dplyr::count() %>%
   dplyr::ungroup() %>%
@@ -1131,8 +1138,84 @@ df.label = cf.result %>%
                    "Building Tuneup or Utility Improvements"="Commissioning") %>%
   dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
                    "GAS"="Gas", "KWHR"="Electricity") %>%
-  dplyr::mutate(action.label = paste0("n=", n)) %>%
+  dplyr::mutate(action.label = paste0("n=", n),
+                model = NA) %>%
   {.}
+
+## for highlevel and toplevel
+## distribution of many models
+target.scenario = "rcp45"
+
+cf.result %>%
+  dplyr::filter(scenario == target.scenario) %>%
+  dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                  "Building Tuneup or Utility Improvements"="Commissioning") %>%
+  dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
+                   "GAS"="Gas", "KWHR"="Electricity") %>%
+  dplyr::filter(is.real.retrofit) %>%
+  ## annual
+  dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+  ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel, model))) +
+  ggplot2::geom_density(alpha=0.3, fill="grey", size=0.5) +
+  ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+  ## ggplot2::geom_rug() +
+  ggplot2::facet_grid(fuel ~ action) +
+  ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
+  ggplot2::geom_text(size=3, data = df.label,
+                     mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
+                     hjust = -0.5, vjust = 1.2) +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
+  ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+  ggplot2::ylab("Probability density") +
+  ggplot2::coord_flip() +
+  ggplot2::theme(legend.position="bottom",
+                 axis.text.x = element_text(size=6),
+                 strip.text.x = element_text(size = 7))
+if (kw == "highlevel_bp") {
+  image.width = 8
+} else if (kw == "toplevel_bp") {
+  image.width = 6
+}
+## many models
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s.png", imagedir, kw), width=image.width, height=4)
+
+## for mid and late century
+cf.result %>%
+  dplyr::filter(scenario == target.scenario) %>%
+  dplyr::filter(model == "access1-0.1") %>%
+  dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                  "Building Tuneup or Utility Improvements"="Commissioning") %>%
+  dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
+                   "GAS"="Gas", "KWHR"="Electricity") %>%
+  dplyr::filter(!is.real.retrofit) %>%
+  dplyr::filter(action == "HVAC") %>%
+  ## annual
+  dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+  ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
+                               color=period,
+                               group=interaction(action, fuel, model, period))) +
+  ggplot2::geom_density(alpha=0.2, size=0.2) +
+  ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+  ggplot2::facet_grid(fuel ~ action) +
+  ggplot2::scale_fill_brewer(palette = "Set2") +
+  ggplot2::scale_color_brewer(palette = "Set2") +
+  ggplot2::ylab("Probability Density") +
+  ggplot2::coord_flip() +
+  ## ggplot2::coord_flip(ylim=c(0, 3)) +
+  ggplot2::theme_bw() +
+  ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+  ggplot2::ggtitle("Distribution of treatment effect for the un-retrofitted current vs mid century") +
+  ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
+                 strip.text.x = element_text(size = 7),
+                 plot.title=element_text(size=11))
+if (kw == "highlevel_bp") {
+  image.width = 8
+} else if (kw == "toplevel_bp") {
+  image.width = 6
+}
+## many models
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s.png", imagedir, kw), width=image.width, height=4)
 
 ## annual
 ## for highlevel and toplevel
@@ -2590,14 +2673,21 @@ ggplot2::ggsave(sprintf("%s/many_action_many_building_scc_elecgas_future.png", i
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 ## under climate change
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
-under.climate.change = readr::read_csv("prediction_under_climate_change.csv") %>%
-  dplyr::group_by(BLDGNUM, is.real.retrofit, Substantial_Completion_Date, action, fuel) %>%
+
+kw = "toplevel_bp"
+## kw = "highlevel_bp"
+## kw = "detaillevel_bp"
+## kw = "joint_highlevel_bp"
+under.climate.change = readr::read_csv(sprintf("prediction_under_climate_change_%s.csv", kw)) %>%
+  dplyr::group_by(BLDGNUM, is.real.retrofit, Substantial_Completion_Date, action, fuel, scenario) %>%
   dplyr::summarize(weighted.cmip5.predictions = weighted.mean(x=cmip5.predictions, w=Combined)) %>%
   dplyr::ungroup() %>%
-  dplyr::mutate(scenario = "RCP45 2050-2059") %>%
+  dplyr::mutate(scenario = paste0(toupper(scenario), " 2050-2059")) %>%
   dplyr::filter(!is.real.retrofit) %>%
   dplyr::rename(predictions=weighted.cmip5.predictions) %>%
   {.}
+
+cf.result = readr::read_csv(sprintf("%s/grf_result_%s.csv", tabledir, kw))
 
 ## in slides
 ## annual
@@ -2627,6 +2717,11 @@ df.label.future = to.plot.slides %>%
   dplyr::mutate(action.label = paste0("n=", n)) %>%
   {.}
 
+if (kw == "highlevel_bp") {
+  image.width = 8
+} else if (kw == "toplevel_bp") {
+  image.width = 6
+}
 to.plot.slides %>%
   ggplot2::ggplot(ggplot2::aes(x=predictions, fill=scenario,
                                color=scenario,
@@ -2634,18 +2729,24 @@ to.plot.slides %>%
   ggplot2::geom_density(alpha=0.5) +
   ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
   ggplot2::facet_grid(fuel ~ action) +
-  geom_rug(data = to.plot.slides[to.plot.slides$scenario %in% "now",]) +
-  geom_rug(data = to.plot.slides[to.plot.slides$scenario %in% "RCP45 2050-2059",], sides = "t") +
+  ## plot data points
+  ## geom_rug(data = to.plot.slides[to.plot.slides$scenario %in% "now",]) +
+  ## geom_rug(data = to.plot.slides[to.plot.slides$scenario %in% "RCP45 2050-2059",], sides = "t") +
+  ## geom_rug(data = to.plot.slides[to.plot.slides$scenario %in% "RCP48 2050-2059",], sides = "t") +
   ggplot2::scale_fill_brewer(palette = "Set2") +
   ggplot2::scale_color_brewer(palette = "Set2") +
   ggplot2::ylab("Probability Density") +
-  ggplot2::coord_flip(ylim=c(0, 3)) +
+  ggplot2::coord_flip() +
+  ## ggplot2::coord_flip(ylim=c(0, 3)) +
   ggplot2::theme_bw() +
   ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
   ggplot2::ggtitle("Distribution of treatment effect for the un-retrofitted current vs mid century") +
   ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
-                 strip.text.x = element_text(size = 7))
-ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_control_rcp45_mid_slides.png", imagedir), width=8, height=4)
+                 strip.text.x = element_text(size = 7),
+                 plot.title=element_text(size=11))
+
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_control_rcp45_mid_slides_%s.png", imagedir, kw),
+                width=image.width, height=4)
 
 ## in document
 cf.result %>%
