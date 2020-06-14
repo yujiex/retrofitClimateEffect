@@ -1103,8 +1103,8 @@ ggplot2::ggsave(sprintf("%s/retrofit_climate_scenario_%s_nofacet.png", imagedir,
 ## plot regression result causal forest
 ## kw = "toplevel_bp"
 ## kw = "highlevel_bp"
-kw = "detaillevel_bp"
-## kw = "joint_highlevel_bp"
+## kw = "detaillevel_bp"
+kw = "joint_highlevel_bp"
 cf.result = readr::read_csv(sprintf("%s/grf_result_fewcol_%s.csv", tabledir, kw))
 
 cf.result.significant = cf.result %>%
@@ -1142,21 +1142,22 @@ df.label = cf.result %>%
                 model = NA) %>%
   {.}
 
-## for highlevel and toplevel
-## distribution of many models
 target.scenario = "rcp45"
 
+## for highlevel and toplevel
+## distribution of many models
+## savings distribution under current climate, each model separately
 cf.result %>%
-  dplyr::filter(scenario == target.scenario) %>%
+  dplyr::filter(scenario == target.scenario, period == "now") %>%
   dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
                   "Building Tuneup or Utility Improvements"="Commissioning") %>%
   dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
                    "GAS"="Gas", "KWHR"="Electricity") %>%
-  dplyr::filter(is.real.retrofit) %>%
+  dplyr::filter(is.real.retrofit==1) %>%
   ## annual
   dplyr::mutate(predictions = (-1)*predictions * 12) %>%
   ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel, model))) +
-  ggplot2::geom_density(alpha=0.3, fill="grey", size=0.5) +
+  ggplot2::geom_density(alpha=0.3, fill="grey", size=0.2) +
   ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
   ## ggplot2::geom_rug() +
   ggplot2::facet_grid(fuel ~ action) +
@@ -1165,7 +1166,7 @@ cf.result %>%
                      mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
                      hjust = -0.5, vjust = 1.2) +
   ggplot2::theme_bw() +
-  ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
+  ggplot2::ggtitle(sprintf("Effect distribution for the retrofitted under %s", toupper(target.scenario))) +
   ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
   ggplot2::ylab("Probability density") +
   ggplot2::coord_flip() +
@@ -1178,69 +1179,30 @@ if (kw == "highlevel_bp") {
   image.width = 6
 }
 ## many models
-ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s.png", imagedir, kw), width=image.width, height=4)
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s_%s.png",
+                        imagedir, target.scenario, kw), width=image.width, height=4)
 
-## for mid and late century
+## savings distribution under current climate, stacked
 cf.result %>%
-  dplyr::filter(scenario == target.scenario) %>%
-  dplyr::filter(model == "access1-0.1") %>%
+  dplyr::filter(scenario == target.scenario, period == "now") %>%
   dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
                   "Building Tuneup or Utility Improvements"="Commissioning") %>%
   dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
                    "GAS"="Gas", "KWHR"="Electricity") %>%
-  dplyr::filter(!is.real.retrofit) %>%
-  dplyr::filter(action == "HVAC") %>%
-  ## annual
-  dplyr::mutate(predictions = (-1)*predictions * 12) %>%
-  ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
-                               color=period,
-                               group=interaction(action, fuel, model, period))) +
-  ggplot2::geom_density(alpha=0.2, size=0.2) +
-  ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-  ggplot2::facet_grid(fuel ~ action) +
-  ggplot2::scale_fill_brewer(palette = "Set2") +
-  ggplot2::scale_color_brewer(palette = "Set2") +
-  ggplot2::ylab("Probability Density") +
-  ggplot2::coord_flip() +
-  ## ggplot2::coord_flip(ylim=c(0, 3)) +
-  ggplot2::theme_bw() +
-  ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-  ggplot2::ggtitle("Distribution of treatment effect for the un-retrofitted current vs mid century") +
-  ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
-                 strip.text.x = element_text(size = 7),
-                 plot.title=element_text(size=11))
-if (kw == "highlevel_bp") {
-  image.width = 8
-} else if (kw == "toplevel_bp") {
-  image.width = 6
-}
-## many models
-ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s.png", imagedir, kw), width=image.width, height=4)
-
-## annual
-## for highlevel and toplevel
-cf.result %>%
-  dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
-                  "Building Tuneup or Utility Improvements"="Commissioning") %>%
-  dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
-                   "GAS"="Gas", "KWHR"="Electricity") %>%
-  dplyr::mutate(`retrofit.label`= ifelse(is.real.retrofit,
-                                         "With retrofit",
-                                         "Without retrofit")) %>%
-  dplyr::filter(`retrofit.label`=="With retrofit") %>%
+  dplyr::filter(is.real.retrofit==1) %>%
   ## annual
   dplyr::mutate(predictions = (-1)*predictions * 12) %>%
   ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
-  ggplot2::geom_density(alpha=0.3, fill="grey") +
+  ggplot2::geom_density(alpha=0.3, fill="grey", size=0.4) +
   ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-  ggplot2::geom_rug() +
+  ## ggplot2::geom_rug() +
   ggplot2::facet_grid(fuel ~ action) +
   ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
   ggplot2::geom_text(size=3, data = df.label,
                      mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
                      hjust = -0.5, vjust = 1.2) +
   ggplot2::theme_bw() +
-  ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
+  ggplot2::ggtitle(sprintf("Effect distribution for the retrofitted under %s", toupper(target.scenario))) +
   ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
   ggplot2::ylab("Probability density") +
   ggplot2::coord_flip() +
@@ -1252,9 +1214,95 @@ if (kw == "highlevel_bp") {
 } else if (kw == "toplevel_bp") {
   image.width = 6
 }
-ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_%s.png", imagedir, kw), width=image.width, height=4)
+## many models
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s_%s_stack.png",
+                        imagedir, target.scenario, kw), width=image.width, height=4)
+
+## for mid and late century, individual line
+actions = unique(cf.result$action)
+image.width = 6
+pal = "Dark2"
+lapply(actions, function(target.action) {
+  if (target.action =="Building Tuneup or Utility Improvements") {
+    target.action = "Commissioning"
+  }
+  cf.result %>%
+    dplyr::filter(scenario == target.scenario) %>%
+    dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+    dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                    "Building Tuneup or Utility Improvements"="Commissioning") %>%
+    dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
+                    "GAS"="Gas", "KWHR"="Electricity") %>%
+    dplyr::filter(action == target.action) %>%
+    dplyr::filter(is.real.retrofit == 0) %>%
+    ## annual
+    dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+    ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
+                                color=period,
+                                group=interaction(action, fuel, model, period))) +
+    ggplot2::geom_density(alpha=0.2, size=0.2) +
+    ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+    ggplot2::facet_grid(fuel ~ period) +
+    ggplot2::scale_fill_brewer(palette = pal) +
+    ggplot2::scale_color_brewer(palette = pal) +
+    ggplot2::ylab("Probability Density") +
+    ggplot2::coord_flip() +
+    ## ggplot2::coord_flip(ylim=c(0, 3)) +
+    ggplot2::theme_bw() +
+    ggplot2::ggtitle(sprintf("%s effect distribution for the un-retrofitted under %s over different period",
+                             target.action, toupper(target.scenario))) +
+    ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
+    ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
+                  strip.text.x = element_text(size = 7),
+                  plot.title=element_text(size=9))
+  ## many models
+  ggplot2::ggsave(sprintf("%s/%s_effect_cf_treated_slides_mm_%s_%s.png",
+                          imagedir, target.action, target.scenario, kw),
+                  width=image.width, height=4)
+})
+
+## for mid and late century, stacked
+pal = "Dark2"
+cf.result %>%
+  dplyr::filter(scenario == target.scenario) %>%
+  dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+  ## dplyr::filter(model == "access1-0.1") %>%
+  dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                  "Building Tuneup or Utility Improvements"="Commissioning") %>%
+  dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
+                  "GAS"="Gas", "KWHR"="Electricity") %>%
+  dplyr::filter(is.real.retrofit == 0) %>%
+  ## annual
+  dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+  ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
+                              color=period,
+                              group=interaction(action, fuel, period))) +
+  ggplot2::geom_density(alpha=0.2, size=0.4) +
+  ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+  ggplot2::facet_grid(fuel ~ action) +
+  ggplot2::scale_fill_brewer(palette = pal) +
+  ggplot2::scale_color_brewer(palette = pal) +
+  ggplot2::ylab("Probability Density") +
+  ggplot2::coord_flip() +
+  ## ggplot2::coord_flip(ylim=c(0, 3)) +
+  ggplot2::theme_bw() +
+  ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
+  ggplot2::ggtitle(sprintf("Effect distribution for the un-retrofitted under %s over different period",
+                           toupper(target.scenario))) +
+  ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
+                strip.text.x = element_text(size = 7),
+                plot.title=element_text(size=11))
+if (kw == "highlevel_bp") {
+  image.width = 8
+} else if (kw == "toplevel_bp") {
+  image.width = 6
+}
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s_%s_stack.png", imagedir, target.scenario, kw),
+                width=image.width, height=4)
 
 ## for detaillevel
+stacked = TRUE
+## stacked = FALSE
 if (stringr::str_detect(kw, "detaillevel")) {
   ## for detailed action pairs
   dfs.detailed.action = df.label %>%
@@ -1268,36 +1316,47 @@ if (stringr::str_detect(kw, "detaillevel")) {
     dplyr::group_by(l1, l3) %>%
     dplyr::group_split() %>%
     {.}
+  print(length(dfs.detailed.action))
   lapply(dfs.detailed.action, function(action.to.plot) {
     image.suf <- paste(action.to.plot$l1[[1]], action.to.plot$l3[[1]], sep= "_")
     print(image.suf)
-    df.label <- action.to.plot %>%
+    df.label.oneaction <- action.to.plot %>%
       tidyr::unite("action", l2:l3) %>%
       dplyr::mutate(action = gsub("_NA", "", action)) %>%
       {.}
-    cf.result %>%
+    df.plot = cf.result %>%
+      dplyr::filter(scenario == target.scenario, period == "now") %>%
       dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
                        "Building Tuneup or Utility Improvements"="Commissioning") %>%
       dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
                        "GAS"="Gas", "KWHR"="Electricity") %>%
       dplyr::filter(is.real.retrofit==1) %>%
       tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
-      dplyr::inner_join(action.to.plot, by=c("l1", "l2", "l3", "fuel")) %>%
+      dplyr::inner_join(action.to.plot %>% dplyr::select(-model), by=c("l1", "l2", "l3", "fuel")) %>%
       tidyr::unite("action", l2:l3) %>%
       ## annual
       dplyr::mutate(predictions = (-1)*predictions * 12) %>%
       dplyr::mutate(action = gsub("_NA", "", action)) %>%
-      ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
-      ggplot2::geom_density(alpha=0.3, fill="grey") +
+      {.}
+    if (stacked) {
+      p <- df.plot %>%
+        ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
+        ggplot2::geom_density(alpha=0.3, fill="grey", size=0.4)
+    } else {
+      p <- df.plot %>%
+        ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel, model))) +
+        ggplot2::geom_density(alpha=0.3, fill="grey", size=0.2)
+    }
+    p +
       ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-      ggplot2::geom_rug() +
+      ## ggplot2::geom_rug() +
       ggplot2::facet_grid(fuel ~ action) +
-      ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
-      ggplot2::geom_text(size=3, data =df.label,
+      ggplot2::geom_text(size=3, data =df.label.oneaction,
                         mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
                         hjust = -0.5, vjust = 1.2) +
       ggplot2::theme_bw() +
-      ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
+      ggplot2::ggtitle(sprintf("Effect distribution on the retrofitted under %s",
+                       toupper(target.scenario))) +
       ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
       ggplot2::ylab("Probability density") +
       ggplot2::coord_flip() +
@@ -1305,11 +1364,164 @@ if (stringr::str_detect(kw, "detaillevel")) {
                      axis.text.x = element_text(size=6),
                      strip.text.x = element_text(size = 7),
                      plot.title = element_text(size = 11))
-    ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s.png", imagedir, kw, image.suf),
+    if (stacked) {
+      image.name = sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s_%s_stack.png",
+                           imagedir, kw, image.suf, target.scenario)
+    } else {
+      image.name = sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s_%s.png",
+                           imagedir, kw, image.suf, target.scenario)
+    }
+    ggplot2::ggsave(image.name,
                     width=4, height=4)
     return(NULL)
   })
 }
+
+## for detaillevel mid and late century
+pal = "Dark2"
+## stacked = TRUE
+stacked = FALSE
+if (stringr::str_detect(kw, "detaillevel")) {
+  ## for detailed action pairs
+  dfs.detailed.action = df.label %>%
+    dplyr::filter(n>20) %>%
+    tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
+    dplyr::filter(l2 != "NA") %>%
+    dplyr::group_by(l1, l3, fuel) %>%
+    dplyr::filter(n()>1) %>%
+    dplyr::ungroup() %>%
+    dplyr::arrange(l1, l3, l2) %>%
+    dplyr::group_by(l1, l3) %>%
+    dplyr::group_split() %>%
+    {.}
+  print(length(dfs.detailed.action))
+  lapply(dfs.detailed.action, function(action.to.plot) {
+    image.suf <- paste(action.to.plot$l1[[1]], action.to.plot$l3[[1]], sep= "_")
+    print(image.suf)
+    df.label.oneaction <- action.to.plot %>%
+      tidyr::unite("action", l2:l3) %>%
+      dplyr::mutate(action = gsub("_NA", "", action)) %>%
+      dplyr::mutate(period = NA) %>%
+      {.}
+    df.plot = cf.result %>%
+      dplyr::filter(scenario == target.scenario) %>%
+      dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                       "Building Tuneup or Utility Improvements"="Commissioning") %>%
+      dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
+                       "GAS"="Gas", "KWHR"="Electricity") %>%
+      dplyr::filter(is.real.retrofit==0) %>%
+      tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
+      dplyr::inner_join(action.to.plot %>% dplyr::select(-model), by=c("l1", "l2", "l3", "fuel")) %>%
+      tidyr::unite("action", l2:l3) %>%
+      ## annual
+      dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+      dplyr::mutate(action = gsub("_NA", "", action)) %>%
+      dplyr::mutate(period = ordered(period,
+                                     levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+      dplyr::arrange(period) %>%
+      {.}
+    if (stacked) {
+      image.name =
+        sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s_stack.png",
+                imagedir, kw, image.suf, target.scenario)
+      df.plot %>%
+        ggplot2::ggplot(ggplot2::aes(x=predictions,
+                                     fill=period,
+                                     color=period,
+                                     group=interaction(action, fuel, period))) +
+        ggplot2::geom_density(alpha=0.2, size=0.4) +
+        ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+        ggplot2::facet_grid(fuel ~ action) +
+        ggplot2::theme_bw() +
+        ggplot2::ggtitle(sprintf("Effect distribution on the retrofitted under %s",
+                                 toupper(target.scenario))) +
+        ggplot2::scale_fill_brewer(palette=pal) +
+        ggplot2::scale_color_brewer(palette=pal) +
+        ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+        ggplot2::ylab("Probability density") +
+        ggplot2::coord_flip() +
+        ggplot2::theme(legend.position="bottom",
+                       axis.text.x = element_text(size=6),
+                       strip.text.x = element_text(size = 7),
+                       plot.title = element_text(size = 11),
+                       legend.text = element_text(size=6))
+        ggplot2::theme()
+      ggplot2::ggsave(image.name,
+                      width=4, height=4)
+    } else {
+      allactions = unique(df.plot$action)
+      lapply(allactions, function(target.action) {
+        image.name =
+          sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s.png",
+                  imagedir, kw, gsub(" / ", "", target.action), target.scenario)
+        df.plot %>%
+          dplyr::filter(action == target.action) %>%
+          ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period, color=period,
+                                     group=interaction(action, fuel, model,
+                                                       period))) +
+          ggplot2::geom_density(alpha=0.2, size=0.4) +
+          ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+          ggplot2::facet_grid(fuel ~ period) +
+          ggplot2::theme_bw() +
+          ggplot2::ggtitle(sprintf("Effect distribution on the retrofitted under %s",
+                                  toupper(target.scenario))) +
+          ggplot2::scale_fill_brewer(palette=pal) +
+          ggplot2::scale_color_brewer(palette=pal) +
+          ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+          ggplot2::ylab("Probability density") +
+          ggplot2::coord_flip() +
+          ggplot2::theme(legend.position="bottom",
+                        axis.text.x = element_text(size=6),
+                        strip.text.x = element_text(size = 6),
+                        plot.title = element_text(size = 11),
+                        legend.text = element_text(size=6))
+          ggplot2::theme()
+        ggplot2::ggsave(image.name,
+                        width=4, height=4)
+        return(NULL)
+      })
+    }
+  })
+}
+
+## for mid and late century, stacked
+pal = "Dark2"
+cf.result %>%
+  dplyr::filter(scenario == target.scenario) %>%
+  dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+  ## dplyr::filter(model == "access1-0.1") %>%
+  dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                  "Building Tuneup or Utility Improvements"="Commissioning") %>%
+  dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
+                  "GAS"="Gas", "KWHR"="Electricity") %>%
+  dplyr::filter(is.real.retrofit == 0) %>%
+  ## annual
+  dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+  ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
+                              color=period,
+                              group=interaction(action, fuel, period))) +
+  ggplot2::geom_density(alpha=0.2, size=0.4) +
+  ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+  ggplot2::facet_grid(fuel ~ action) +
+  ggplot2::scale_fill_brewer(palette = pal) +
+  ggplot2::scale_color_brewer(palette = pal) +
+  ggplot2::ylab("Probability Density") +
+  ggplot2::coord_flip() +
+  ## ggplot2::coord_flip(ylim=c(0, 3)) +
+  ggplot2::theme_bw() +
+  ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
+  ggplot2::ggtitle(sprintf("Effect distribution for the un-retrofitted under %s over different period",
+                           toupper(target.scenario))) +
+  ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
+                strip.text.x = element_text(size = 7),
+                plot.title=element_text(size=11))
+if (kw == "highlevel_bp") {
+  image.width = 8
+} else if (kw == "toplevel_bp") {
+  image.width = 6
+}
+ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_mm_%s_%s_stack.png", imagedir, target.scenario, kw),
+                width=image.width, height=4)
 
 ## check pre and co-existing actions
 target.action = "HVAC_Repairs_Cooling Tower"
@@ -1338,24 +1550,45 @@ joint.to.plot = df.label %>%
   dplyr::mutate(action = gsub("Lighting", "L", action)) %>%
   {.}
 
-cf.result %>%
+df.plot = cf.result %>%
   dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
                     "GAS"="Gas", "KWHR"="Electricity") %>%
-  dplyr::filter(is.real.retrofit==1) %>%
   dplyr::mutate(action = gsub(" and ", " & ", action)) %>%
   dplyr::mutate(action = gsub("Advanced Metering", "A", action)) %>%
   dplyr::mutate(action = gsub("Building Envelope", "B", action)) %>%
   dplyr::mutate(action = gsub("Building Tuneup or Utility Improvements", "C", action)) %>%
   dplyr::mutate(action = gsub("HVAC", "H", action)) %>%
   dplyr::mutate(action = gsub("Lighting", "L", action)) %>%
-  dplyr::inner_join(joint.to.plot, by=c("action", "fuel")) %>%
+  dplyr::inner_join(joint.to.plot %>% dplyr::select(-model),
+                    by=c("action", "fuel")) %>%
   ## annual
   dplyr::mutate(predictions = (-1)*predictions * 12) %>%
   dplyr::mutate(action = gsub("_NA", "", action)) %>%
-  ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
-  ggplot2::geom_density(alpha=0.3, fill="grey") +
+  {.}
+
+## stacked = TRUE
+stacked = FALSE
+df.plot.treated <- df.plot %>%
+  dplyr::filter(is.real.retrofit==1) %>%
+  dplyr::filter(scenario == target.scenario, period == "now") %>%
+  {.}
+if (stacked) {
+  imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s_stack.png", imagedir, target.scenario, kw)
+  linesize = 0.4
+  p <- df.plot.treated %>%
+    ggplot2::ggplot(ggplot2::aes(x=predictions,
+                                 group=interaction(action, fuel)))
+} else {
+  imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s.png", imagedir, target.scenario, kw)
+  linesize = 0.2
+  p <- df.plot.treated %>%
+    ggplot2::ggplot(ggplot2::aes(x=predictions,
+                                 group=interaction(action, fuel, model)))
+}
+p +
+  ggplot2::geom_density(alpha=0.3, fill="grey", size=linesize) +
   ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-  ggplot2::geom_rug() +
+  ## ggplot2::geom_rug() +
   ggplot2::facet_grid(fuel ~ action) +
   ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
   ggplot2::geom_text(size=3, data =joint.to.plot,
@@ -1370,8 +1603,75 @@ cf.result %>%
                   axis.text.x = element_text(size=6),
                   strip.text.x = element_text(size = 7),
                   plot.title = element_text(size = 12))
-ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_treated_slides_%s.png", imagedir, kw),
+ggplot2::ggsave(imagename,
                 width=6, height=4)
+
+## joint high-level
+## for mid and late century, individual line
+actions = unique(df.plot$action)
+image.width = 6
+pal = "Dark2"
+lapply(actions, function(target.action) {
+  df.plot %>%
+    dplyr::filter(scenario == target.scenario) %>%
+    dplyr::filter(is.real.retrofit == 0) %>%
+    dplyr::filter(action == target.action) %>%
+    dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+    ## annual
+    dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+    ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
+                                color=period,
+                                group=interaction(action, fuel, model, period))) +
+    ggplot2::geom_density(alpha=0.2, size=0.2) +
+    ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+    ggplot2::facet_grid(fuel ~ period) +
+    ggplot2::scale_fill_brewer(palette = pal) +
+    ggplot2::scale_color_brewer(palette = pal) +
+    ggplot2::ylab("Probability Density") +
+    ggplot2::coord_flip() +
+    ## ggplot2::coord_flip(ylim=c(0, 3)) +
+    ggplot2::theme_bw() +
+    ggplot2::ggtitle(sprintf("%s effect distribution for the un-retrofitted under %s over different period",
+                             target.action, toupper(target.scenario))) +
+    ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
+    ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
+                  strip.text.x = element_text(size = 7),
+                  plot.title=element_text(size=9))
+  ## many models
+  ggplot2::ggsave(sprintf("%s/%s_effect_cf_control_slides_mm_%s_%s.png",
+                          imagedir, target.action, target.scenario, kw),
+                  width=image.width, height=4)
+})
+
+## for mid and late century, stacked
+pal = "Dark2"
+df.plot %>%
+  dplyr::filter(scenario == target.scenario) %>%
+  dplyr::filter(is.real.retrofit == 0) %>%
+  dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+  ## annual
+  dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+  ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
+                                color=period,
+                                group=interaction(action, fuel, period))) +
+  ggplot2::geom_density(alpha=0.2, size=0.4) +
+  ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+  ggplot2::facet_grid(fuel ~ action) +
+  ggplot2::scale_fill_brewer(palette = pal) +
+  ggplot2::scale_color_brewer(palette = pal) +
+  ggplot2::ylab("Probability Density") +
+  ggplot2::coord_flip() +
+  ## ggplot2::coord_flip(ylim=c(0, 3)) +
+  ggplot2::theme_bw() +
+  ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
+  ggplot2::ggtitle(sprintf("Effect distribution for the un-retrofitted under %s over different period",
+                           toupper(target.scenario))) +
+  ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
+                strip.text.x = element_text(size = 7),
+                plot.title=element_text(size=11))
+ggplot2::ggsave(sprintf("%s/%s_effect_cf_control_slides_mm_%s_%s.png",
+                        imagedir, target.action, target.scenario, kw),
+                width=image.width, height=4)
 
 ## in document
 cf.result %>%
@@ -2674,8 +2974,8 @@ ggplot2::ggsave(sprintf("%s/many_action_many_building_scc_elecgas_future.png", i
 ## under climate change
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 
-kw = "toplevel_bp"
-## kw = "highlevel_bp"
+## kw = "toplevel_bp"
+kw = "highlevel_bp"
 ## kw = "detaillevel_bp"
 ## kw = "joint_highlevel_bp"
 under.climate.change = readr::read_csv(sprintf("prediction_under_climate_change_%s.csv", kw)) %>%
@@ -2722,6 +3022,7 @@ if (kw == "highlevel_bp") {
 } else if (kw == "toplevel_bp") {
   image.width = 6
 }
+
 to.plot.slides %>%
   ggplot2::ggplot(ggplot2::aes(x=predictions, fill=scenario,
                                color=scenario,
