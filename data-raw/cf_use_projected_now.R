@@ -19,10 +19,24 @@ load("../data/cmip5.bin.period.rda")
 
 load("../data/cmip5.bin.period.threeyear.rda")
 
+dfs.cmip5 = cmip5.bin.period %>%
+  ## dplyr::filter(period == "2090Jan through 2099Jan") %>%
+  dplyr::filter(period == "2050Jan through 2059Jan") %>%
+  dplyr::group_by(scenario, period, model) %>%
+  dplyr::group_split() %>%
+  {.}
+
 ## prev.action: df with previous action
 ## fuel.and.other: df with other fields
 ## kw: key words in file naming
-fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
+## fit.cf <- function(prev.action, fuel.and.other, kw, projected.weather=TRUE, bound.propensity=TRUE) {
+
+  prev.action = retrofit_prev_actions_highlevel
+  fuel.and.other = non.action.data
+  kw = "highlevel_bp"
+  projected.weather=FALSE
+  bound.propensity=TRUE
+
   if (bound.propensity) {
     kw = paste0(kw, "_bp")
   }
@@ -30,14 +44,28 @@ fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
     dplyr::group_by(target.action) %>%
     dplyr::group_split() %>%
     {.}
-  dfs.by.fuel = fuel.and.other %>%
-    ## use climate projected now to build model
-    dplyr::filter(model != "measured") %>%
-    dplyr::group_by(variable, model, scenario) %>%
-    dplyr::group_split() %>%
-    {.}
+  if (projected.weather) {
+    dfs.by.fuel = fuel.and.other %>%
+      ## use climate projected now to build model
+      dplyr::filter(model != "measured") %>%
+      dplyr::group_by(variable, model, scenario) %>%
+      dplyr::group_split() %>%
+      {.}
+  } else {
+    dfs.by.fuel = fuel.and.other %>%
+      ## use climate projected now to build model
+      dplyr::filter(model == "measured") %>%
+      dplyr::group_by(variable, model, scenario) %>%
+      dplyr::group_split() %>%
+      {.}
+  }
+
   result = lapply(dfs.by.action, function(df.action) {
     result.inner = lapply(dfs.by.fuel, function(df.fuel) {
+
+      df.action = dfs.by.action[[1]]
+      df.fuel = dfs.by.fuel[[1]]
+
       action = df.action$target.action[[1]]
       modelname = df.fuel$model[[1]]
       scenarioname = df.fuel$scenario[[1]]
@@ -60,6 +88,7 @@ fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
         dplyr::mutate_if(is.logical, as.numeric) %>%
         dplyr::select(-variable) %>%
         {.}
+
       X = df.allfeature %>%
         select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -eui.diff, -model, -scenario) %>%
         as.matrix() %>%
@@ -76,18 +105,57 @@ fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
         c.forest = c.forest.initial
       }
       prediction.old <- predict(c.forest, estimate.variance = T)
-      new.data <- df.allfeature %>%
-        dplyr::select(-(`<10`:`>90`)) %>%
-        dplyr::inner_join(cmip5.bin.period.threeyear, by=c("BLDGNUM", "model", "scenario")) %>%
-        dplyr::select(-Missing, -Latitude, -Longitude) %>%
-        {.}
+
+      if (projected.weather) {
+        new.data <- df.allfeature %>%
+          dplyr::select(-(`<10`:`>90`)) %>%
+          dplyr::inner_join(cmip5.bin.period.threeyear, by=c("BLDGNUM", "model", "scenario")) %>%
+          dplyr::select(-Missing, -Latitude, -Longitude) %>%
+          {.}
+      } else {
+
+        df.climate = dfs.cmip5[[1]]
+        df = df.climate %>%
+          dplyr::select(-Latitude, -Longitude, -period, -model, -scenario) %>%
+          {.}
+
+        new.data <- df.allfeature %>%
+          dplyr::select(-(`<10`:`>90`), -model, -scenario) %>%
+          dplyr::inner_join(cmip5.bin.period, by="BLDGNUM") %>%
+          ## debug
+          dplyr::filter(model == "access1-0.1", scenario == "rcp45", period == "2050Jan through 2059Jan") %>%
+          ## dplyr::inner_join(cmip5.bin.period.threeyear, by="BLDGNUM") %>%
+          dplyr::select(-Missing, -Latitude, -Longitude) %>%
+          ## dplyr::inner_join(df, by="BLDGNUM") %>%
+          ## dplyr::select(-Missing) %>%
+          {.}
+
+      }
+
+      new.data %>%
+        dplyr::select(BLDGNUM, `<10`:`>90`)
+
+      ## use old code, estimate with input of one climate model at a time
       X.new <- new.data %>%
+        ## for debug
+        dplyr::filter(BLDGNUM == "AL0000AB") %>%
+        dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -eui.diff) %>%
+        dplyr::select(GROSSSQFT:htdd, `<10`:`>90`, everything()) %>%
+        as.matrix() %>%
+        {.}
+
+      ## use all climate scenario
+      X.new <- new.data %>%
+        ## for debug
+        dplyr::filter(BLDGNUM == "AL0000AB", model == "access1-0.1", scenario == "rcp45", period == "2050Jan through 2059Jan") %>%
         dplyr::select(-period, -model, -scenario) %>%
         dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -eui.diff) %>%
         dplyr::select(GROSSSQFT:htdd, `<10`:`>90`, everything()) %>%
         as.matrix() %>%
         {.}
+
       prediction.new = predict(c.forest, X.new, estimate.variance = T)
+
       df.result = dplyr::bind_cols(df.allfeature, prediction.old) %>%
         dplyr::mutate(period = "now") %>%
         dplyr::bind_rows(dplyr::bind_cols(new.data, prediction.new)) %>%
@@ -109,20 +177,24 @@ fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
   dfs.var.importance = lapply(unnested, function(li) {
     li$df.var.importance
   })
-  ## prediction for current climate
+  if (projected.weather) {
+    suf = ""
+  } else {
+    suf = "_measured_input"
+  }
   output.result = dfs.result.prediction %>%
     dplyr::bind_rows() %>%
     {.}
   output.result %>%
-    readr::write_csv(sprintf("../tables/grf_result_%s.csv", kw))
+    readr::write_csv(sprintf("../tables/grf_result_%s%s.csv", kw, suf))
   output.result %>%
     dplyr::select(BLDGNUM, `Substantial_Completion_Date`, is.real.retrofit,
                   action, fuel, period, model, scenario, predictions,
                   variance.estimates) %>%
-    readr::write_csv(sprintf("../tables/grf_result_fewcol_%s.csv", kw))
+    readr::write_csv(sprintf("../tables/grf_result_fewcol_%s%s.csv", kw, suf))
   dfs.var.importance %>%
     dplyr::bind_rows() %>%
-    readr::write_csv(sprintf("../tables/grf_var_importance_%s.csv", kw))
+    readr::write_csv(sprintf("../tables/grf_var_importance_%s%s.csv", kw, suf))
 }
 
 ## output retrofit effect estimates
@@ -137,3 +209,7 @@ fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data, "joint_highlevel"
 
 set.seed(0)
 fit.cf(retrofit_prev_actions_detaillevel, non.action.data, "detaillevel")
+
+## use NOAA measured input
+set.seed(0)
+fit.cf(retrofit_prev_actions_highlevel, non.action.data, "highlevel", projected.weather=FALSE, bound.propensity=TRUE)
