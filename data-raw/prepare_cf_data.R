@@ -2,6 +2,9 @@ library("dplyr")
 
 load("../data/retrofit.alldata.rda")
 
+retrofit.alldata %>%
+  names()
+
 pre.nonenergy = retrofit.alldata %>%
   dplyr::filter(retro.status == "pre") %>%
   dplyr::mutate(is.office = (`Building_Type`=="Office")) %>%
@@ -19,8 +22,8 @@ pre.nonenergy = retrofit.alldata %>%
 pre.energy = retrofit.alldata %>%
   dplyr::filter(!(variable %in% c("KWDMD", "OIL"))) %>%
   dplyr::filter(retro.status == "pre") %>%
-  dplyr::select(BLDGNUM, is.real.retrofit,
-                `Substantial_Completion_Date`, variable, mean.kbtu, GROSSSQFT) %>%
+  dplyr::distinct(BLDGNUM, is.real.retrofit, `Substantial_Completion_Date`,
+                  variable, mean.kbtu, GROSSSQFT) %>%
   dplyr::mutate(kbtu.per.sqft = mean.kbtu/GROSSSQFT) %>%
   dplyr::select(-mean.kbtu, -GROSSSQFT) %>%
   tidyr::spread(variable, kbtu.per.sqft, fill=0) %>%
@@ -28,8 +31,8 @@ pre.energy = retrofit.alldata %>%
 
 eui.diff.total = retrofit.alldata %>%
   dplyr::filter(!(variable %in% c("KWDMD", "OIL"))) %>%
-  dplyr::select(BLDGNUM, Substantial_Completion_Date, retro.status,
-                is.real.retrofit, variable, mean.kbtu, GROSSSQFT) %>%
+  dplyr::distinct(BLDGNUM, Substantial_Completion_Date, retro.status,
+                  is.real.retrofit, variable, mean.kbtu, GROSSSQFT) %>%
   dplyr::mutate(kbtu.per.sqft = mean.kbtu / GROSSSQFT) %>%
   dplyr::select(-mean.kbtu, -GROSSSQFT) %>%
   tidyr::spread(retro.status, kbtu.per.sqft) %>%
@@ -43,4 +46,4 @@ non.action.data = pre.nonenergy %>%
   dplyr::filter(variable %in% c("KWHR", "GAS")) %>%
   {.}
 
-usethis::use_data(non.action.data)
+usethis::use_data(non.action.data, overwrite = T)
