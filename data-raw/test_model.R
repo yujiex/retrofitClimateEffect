@@ -17,6 +17,11 @@ options(tibble.width=NULL)
 ## compare results under different climate scenario
 load("../data/cmip5.bin.period.rda")
 
+non.action.data.measure = non.action.data %>%
+  dplyr::filter(scenario == "measured") %>%
+  dplyr::select(-model, -scenario) %>%
+  {.}
+
 dfs.cmip5 = cmip5.bin.period %>%
   dplyr::filter(period == "2050Jan through 2059Jan",
                 scenario == "rcp45") %>%
@@ -113,7 +118,7 @@ fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
       modelname = df.climate$model[[1]]
       print(paste(fuel, action, period, scenario, j, "----", modelname))
       df = df.climate %>%
-        dplyr::select(-Latitude, -Longitude, -period, -model, -scenario) %>%
+        dplyr::select(-Latitude, -Longitude, -period, -model, -scenario, -Missing) %>%
         {.}
       new.data <- old.data %>%
         dplyr::select(-(`<10`:`>90`)) %>%
@@ -121,6 +126,7 @@ fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
         {.}
       X.new = new.data %>%
         dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -eui.diff, -predictions, -debiased.error, -excess.error, -action, -fuel, -variance.estimates) %>%
+        dplyr::select(GROSSSQFT:htdd, `<10`:`>90`, everything()) %>%
         as.matrix() %>%
         {.}
       prediction.new = predict(learned.model, X.new, estimate.variance = T)
@@ -144,7 +150,7 @@ fit.cf <- function(prev.action, fuel.and.other, kw, bound.propensity=T) {
 
 ## output retrofit effect estimates
 set.seed(0)
-fit.cf(retrofit_prev_actions_highlevel, non.action.data, "highlevel")
+fit.cf(retrofit_prev_actions_highlevel, non.action.data.measure, "highlevel")
 
 set.seed(0)
 fit.cf(retrofit_prev_actions_toplevel, non.action.data, "toplevel")
