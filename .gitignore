@@ -11,6 +11,9 @@
 *.pdf
 *.aux
 *.out
+*.toc
+*.bbl
+*.blg
 
 # Rmd generated #
 ###################
