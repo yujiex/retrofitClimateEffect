@@ -9,9 +9,9 @@ pal = "Dark2"
 
 suf = "_measured_input"
 
-## kw = "toplevel_bp"
+kw = "toplevel_bp"
 ## kw = "highlevel_bp"
-kw = "detaillevel_bp"
+## kw = "detaillevel_bp"
 ## kw = "joint_highlevel_bp"
 kw = paste0(kw, suf)
 
@@ -41,6 +41,7 @@ df.label = cf.result %>%
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 ## for highlevel and toplevel
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+plotkind = "vio"
 ## distributions of the treated under current climate, using NOAA inputs
 df.plot.treated = cf.result %>%
   dplyr::filter(period == "now") %>%
@@ -52,6 +53,51 @@ df.plot.treated = cf.result %>%
   ## annual
   dplyr::mutate(predictions = (-1)*predictions * 12) %>%
   {.}
+if (stringr::str_detect(kw, "highlevel_bp")) {
+  df.plot.treated <- df.plot.treated %>%
+    dplyr::mutate(action = factor(action, levels = c("Advanced Metering", "GSALink", "Commissioning", "Building Envelope", "HVAC", "Lighting"))) %>%
+    {.}
+  if (plotkind == "vio") {
+    image.width = 8
+    image.height = 6
+  } else {
+    image.height = 4
+    image.width = 8
+  }
+} else if (stringr::str_detect(kw, "toplevel_bp")) {
+  image.width = 6
+}
+if (plotkind == "vio") {
+  if (stringr::str_detect(kw, "highlevel_bp")) {
+    num.row = 2
+  } else {
+    num.row = 1
+  }
+  imagename = sprintf("%s/retrofit_effect_cf_treated_slides_vio_%s.png",
+                      imagedir, kw)
+  df.plot.treated %>%
+    ggplot2::ggplot(ggplot2::aes(x = action, y=predictions,
+                                 group=interaction(action, fuel),
+                                 fill=action)) +
+    ggplot2::geom_point(shape = 21, position = position_jitter(), size=0.5)+
+    ggplot2::geom_violin(alpha=0.3, size=0.4) +
+    ggplot2::geom_boxplot(width=0.05, outlier.shape=NA) +
+    ggplot2::geom_hline(yintercept=0, linetype = "dashed") +
+    ## ggplot2::geom_rug() +
+    ggplot2::facet_wrap(fuel~., nrow=num.row) +
+    ggplot2::geom_text(size=3, data = df.label,
+                       mapping=ggplot2::aes(x = action, y = 0, label=action.label),
+                       hjust = -0.5, vjust = 1.2) +
+    ggplot2::theme_bw() +
+    ggplot2::ggtitle("Effect distribution for the retrofitted with measured weather input") +
+    ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+    ggplot2::ylab("Probability density") +
+    ggplot2::theme(legend.position="bottom",
+                   axis.text.x = element_text(size=6),
+                   strip.text.x = element_text(size = 7))
+  ggplot2::ggsave(imagename, width=image.width, height=image.height)
+} else {
+  image.height = 4
   imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s.png",
                       imagedir, kw)
   df.plot.treated %>%
@@ -72,12 +118,8 @@ df.plot.treated = cf.result %>%
     ggplot2::theme(legend.position="bottom",
                   axis.text.x = element_text(size=6),
                   strip.text.x = element_text(size = 7))
-if (stringr::str_detect(kw, "highlevel_bp")) {
-  image.width = 8
-} else if (stringr::str_detect(kw, "toplevel_bp")) {
-  image.width = 6
+  ggplot2::ggsave(imagename, width=image.width, height=image.height)
 }
-ggplot2::ggsave(imagename, width=image.width, height=4)
 
 ## distributions of the treated under current climate, using cmip5 inputs
 for (target.scenario in c("rcp45", "rcp85")) {
@@ -301,7 +343,7 @@ for (target.scenario in c("rcp45", "rcp85")) {
 if (stringr::str_detect(kw, "detaillevel")) {
   ## for detailed action pairs
   dfs.detailed.action = df.label %>%
-    dplyr::filter(n>20) %>%
+    ## dplyr::filter(n>20) %>%
     tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
     dplyr::filter(l2 != "NA") %>%
     dplyr::group_by(l1, l3, fuel) %>%
@@ -333,26 +375,59 @@ if (stringr::str_detect(kw, "detaillevel")) {
       dplyr::mutate(predictions = (-1)*predictions * 12) %>%
       dplyr::mutate(action = gsub("_NA", "", action)) %>%
       {.}
-    imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s.png",
+    if (plotkind == "vio") {
+      df.label.oneaction <- df.label.oneaction %>%
+        dplyr::mutate(action = gsub("_", " ", action)) %>%
+        dplyr::mutate(action = ifelse(stringr::word(action) %in% c("New", "Repairs", "Indoor", "Outdoor"), paste0(stringr::word(action), "\n", substr(action, stringr::str_locate(action, " ")[,1] + 1, nchar(action))), action)) %>%
+        {.}
+      imagename = sprintf("%s/retrofit_effect_cf_treated_slides_vio_%s_%s.png",
                           imagedir, image.suf, kw)
-    df.plot.treated %>%
-      ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
-      ggplot2::geom_density(alpha=0.3, fill="grey", size=0.4) +
-      ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-      ## ggplot2::geom_rug() +
-      ggplot2::facet_grid(fuel ~ action) +
-      ggplot2::geom_text(size=3, data =df.label.oneaction,
-                        mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
-                        hjust = -0.5, vjust = 1.2) +
-      ggplot2::theme_bw() +
-      ggplot2::ggtitle("Effect distribution on the retrofitted with measured weather input") +
-      ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-      ggplot2::ylab("Probability density") +
-      ggplot2::coord_flip() +
-      ggplot2::theme(legend.position="bottom",
-                    axis.text.x = element_text(size=6),
-                    strip.text.x = element_text(size = 7),
-                    plot.title = element_text(size = 8))
+      df.plot.treated %>%
+        dplyr::mutate(action = gsub("_", " ", action)) %>%
+        dplyr::mutate(action = ifelse(stringr::word(action) %in% c("New", "Repairs", "Indoor", "Outdoor"), paste0(stringr::word(action), "\n", substr(action, stringr::str_locate(action, " ")[,1] + 1, nchar(action))), action)) %>%
+        ggplot2::ggplot(ggplot2::aes(x = action, y=predictions,
+                                     group=interaction(action, fuel),
+                                     fill=action)) +
+        ggplot2::geom_point(shape = 21, position = position_jitter(), size=0.5)+
+        ggplot2::geom_violin(alpha=0.3, size=0.4) +
+        ggplot2::geom_boxplot(width=0.05, outlier.shape=NA) +
+        ggplot2::geom_hline(yintercept=0, linetype = "dashed") +
+        ggplot2::facet_wrap(fuel~.) +
+        ggplot2::geom_text(size=3, data = df.label.oneaction,
+                           mapping=ggplot2::aes(x = action, y = 0, label=action.label),
+                           hjust = -0.5, vjust = 1.2) +
+        ggplot2::theme_bw() +
+        ggplot2::ggtitle("Effect distribution on the retrofitted with measured weather input") +
+        ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+        ggplot2::ylab("Probability density") +
+        ggplot2::theme(legend.position="bottom",
+                       legend.text = element_text(size = 8),
+                       ## axis.text.x = element_text(size=6),
+                       axis.text.x = element_blank(),
+                       strip.text.x = element_text(size = 7),
+                       plot.title = element_text(size = 8))
+    } else {
+      imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s.png",
+                          imagedir, image.suf, kw)
+      df.plot.treated %>%
+        ggplot2::ggplot(ggplot2::aes(x=predictions, group=interaction(action, fuel))) +
+        ggplot2::geom_density(alpha=0.3, fill="grey", size=0.4) +
+        ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+        ## ggplot2::geom_rug() +
+        ggplot2::facet_grid(fuel ~ action) +
+        ggplot2::geom_text(size=3, data =df.label.oneaction,
+                           mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
+                           hjust = -0.5, vjust = 1.2) +
+        ggplot2::theme_bw() +
+        ggplot2::ggtitle("Effect distribution on the retrofitted with measured weather input") +
+        ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+        ggplot2::ylab("Probability density") +
+        ggplot2::coord_flip() +
+        ggplot2::theme(legend.position="bottom",
+                       axis.text.x = element_text(size=6),
+                       strip.text.x = element_text(size = 7),
+                       plot.title = element_text(size = 8))
+    }
     ggplot2::ggsave(imagename, width=4, height=4)
     return(NULL)
   })
@@ -699,29 +774,54 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
     dplyr::filter(is.real.retrofit==1) %>%
     dplyr::filter(period == "now") %>%
     {.}
-  imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s.png", imagedir, kw)
-  linesize = 0.4
-  df.plot.treated %>%
-    ggplot2::ggplot(ggplot2::aes(x=predictions,
-                                group=interaction(action, fuel))) +
-    ggplot2::geom_density(alpha=0.3, fill="grey", size=linesize) +
-    ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-    ## ggplot2::geom_rug() +
-    ggplot2::facet_grid(fuel ~ action) +
-    ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
-    ggplot2::geom_text(size=3, data =joint.to.plot,
-                      mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
-                      hjust = -0.5, vjust = 1.2) +
-    ggplot2::theme_bw() +
-    ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
-    ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-    ggplot2::ylab("Probability density") +
-    ggplot2::coord_flip() +
-    ggplot2::theme(legend.position="bottom",
-                    axis.text.x = element_text(size=6),
-                    strip.text.x = element_text(size = 7),
-                    plot.title = element_text(size = 12))
-  ggplot2::ggsave(imagename, width=6, height=4)
+  if (plotkind == "vio") {
+    imagename = sprintf("%s/retrofit_effect_cf_treated_slides_vio_%s.png", imagedir, kw)
+    df.plot.treated %>%
+      ggplot2::ggplot(ggplot2::aes(x = action, y=predictions,
+                                  group=interaction(action, fuel),
+                                  fill=action)) +
+      ggplot2::geom_point(shape = 21, position = position_jitter(), size=0.5)+
+      ggplot2::geom_violin(alpha=0.3, size=0.4) +
+      ggplot2::geom_boxplot(width=0.05, outlier.shape=NA) +
+      ggplot2::geom_hline(yintercept=0, linetype = "dashed") +
+      ggplot2::facet_wrap(fuel~.) +
+      ggplot2::geom_text(size=3, data = joint.to.plot,
+                         mapping=ggplot2::aes(x = action, y = 0, label=action.label),
+                         hjust = -0.5, vjust = 1.2) +
+      ggplot2::theme_bw() +
+      ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
+      ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+      ggplot2::ylab("Probability density") +
+      ggplot2::theme(legend.position="bottom",
+                      axis.text.x = element_text(size=6),
+                      strip.text.x = element_text(size = 7),
+                      plot.title = element_text(size = 12))
+    ggplot2::ggsave(imagename, width=6, height=4)
+  } else {
+    imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s.png", imagedir, kw)
+    linesize = 0.4
+    df.plot.treated %>%
+      ggplot2::ggplot(ggplot2::aes(x=predictions,
+                                  group=interaction(action, fuel))) +
+      ggplot2::geom_density(alpha=0.3, fill="grey", size=linesize) +
+      ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+      ## ggplot2::geom_rug() +
+      ggplot2::facet_grid(fuel ~ action) +
+      ggplot2::scale_fill_brewer(name = "Whether retrofitted", palette = "Purples") +
+      ggplot2::geom_text(size=3, data =joint.to.plot,
+                        mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
+                        hjust = -0.5, vjust = 1.2) +
+      ggplot2::theme_bw() +
+      ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
+      ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+      ggplot2::ylab("Probability density") +
+      ggplot2::coord_flip() +
+      ggplot2::theme(legend.position="bottom",
+                      axis.text.x = element_text(size=6),
+                      strip.text.x = element_text(size = 7),
+                      plot.title = element_text(size = 12))
+    ggplot2::ggsave(imagename, width=6, height=4)
+  }
 }
 
 ## distributions of the treated under current climate, using cmip5 inputs
