@@ -56,8 +56,8 @@ suf = "_measured_input"
 
 ## kw = "toplevel_bp"
 ## kw = "highlevel_bp"
-## kw = "detaillevel_bp"
-kw = "joint_highlevel_bp"
+kw = "detaillevel_bp"
+## kw = "joint_highlevel_bp"
 kw = paste0(kw, suf)
 
 cf.result = readr::read_csv(sprintf("%s/grf_result_fewcol_%s.csv", tabledir, kw)) %>%
@@ -319,7 +319,7 @@ for (target.scenario in c("rcp45", "rcp85")) {
   for (stacked in c(TRUE, FALSE)) {
     df.plot.control = cf.result %>%
       dplyr::filter(scenario == target.scenario, is.real.retrofit == 0) %>%
-      dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+      dplyr::mutate(period = factor(period, levels=c("now", "mid-century", "late-century"))) %>%
       dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
                       "Building Tuneup or Utility Improvements"="Commissioning") %>%
       dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
@@ -600,7 +600,7 @@ if (stringr::str_detect(kw, "detaillevel")) {
           dplyr::filter(scenario == target.scenario) %>%
           dplyr::filter(is.real.retrofit==0) %>%
           dplyr::bind_rows(df.insample) %>%
-          dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+          dplyr::mutate(period = factor(period, levels=c("now", "mid-century", "late-century"))) %>%
           dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
                           "Building Tuneup or Utility Improvements"="Commissioning") %>%
           dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
@@ -720,7 +720,7 @@ if (stringr::str_detect(kw, "detaillevel")) {
           dplyr::mutate(predictions = (-1)*predictions * 12) %>%
           dplyr::mutate(action = gsub("_NA", "", action)) %>%
           dplyr::mutate(period = ordered(period,
-                                        levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+                                        levels=c("now", "mid-century", "late-century"))) %>%
           dplyr::arrange(period) %>%
           {.}
         if (stacked) {
@@ -1021,7 +1021,7 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
     df.plot.control <- df.plot %>%
       dplyr::filter(scenario == target.scenario) %>%
       dplyr::filter(is.real.retrofit == 0) %>%
-      dplyr::mutate(period = factor(period, levels=c("now", "2050Jan through 2059Jan", "2090Jan through 2099Jan"))) %>%
+      dplyr::mutate(period = factor(period, levels=c("now", "mid-century", "late-century"))) %>%
       {.}
     for (stacked in c(FALSE)) {
       ## for (stacked in c(TRUE, FALSE)) {
@@ -1036,7 +1036,6 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
           ggplot2::scale_color_brewer(palette = pal) +
           ggplot2::ylab("Probability Density") +
           ggplot2::coord_flip() +
-          ## ggplot2::coord_flip(ylim=c(0, 3)) +
           ggplot2::theme_bw() +
           ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
           ggplot2::ggtitle(sprintf("Effect distribution for the un-retrofitted under %s over different period",
