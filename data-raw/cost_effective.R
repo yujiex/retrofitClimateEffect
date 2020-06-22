@@ -28,10 +28,9 @@ features = retrofit.alldata %>%
   dplyr::select(-`Building_Type`) %>%
   {.}
 
-## HPDB does not have cost info
+## fit highlevel
 dfs = retrofit_from_db %>%
   dplyr::distinct(Building_Number, Substantial_Completion_Date, high_level_ECM, source_highlevel) %>%
-  ## distinct(source_highlevel) %>%
   dplyr::mutate(value = 1) %>%
   tidyr::spread(high_level_ECM, value, fill=0) %>%
   dplyr::left_join(cost.lightouch, by=c("Building_Number", "Substantial_Completion_Date")) %>%
@@ -88,3 +87,32 @@ est %>%
   dplyr::arrange(historic, field) %>%
   dplyr::select(field, everything()) %>%
   readr::write_csv("action_cost_wide.csv")
+
+## fit detaillevel
+dfs.detail = retrofit_from_db %>%
+  dplyr::distinct(Building_Number, Substantial_Completion_Date, detail_level_ECM) %>%
+  dplyr::mutate(value = 1) %>%
+  na.omit() %>%
+  tidyr::spread(detail_level_ECM, value, fill=0) %>%
+  dplyr::inner_join(cost.lightouch, by=c("Building_Number", "Substantial_Completion_Date")) %>%
+  dplyr::inner_join(features, by=c("Building_Number"="BLDGNUM")) %>%
+  dplyr::mutate(cost.per.sqft = cost/GROSSSQFT) %>%
+  dplyr::select(-`Building_Number`, -`Substantial_Completion_Date`, -cost) %>%
+  dplyr::group_by(historic) %>%
+  dplyr::group_split() %>%
+  {.}
+
+## fit with lm gives many negative coefs, but implementation cost should not be
+## negative
+df = dfs.detail[[1]]
+historic = df$historic[[1]]
+df.model = df %>%
+  dplyr::select(-is.office, -historic, -GROSSSQFT) %>%
+  {.}
+cost.est = lm(cost.per.sqft~., data=df.model)
+
+## fit with non-negative least square, there are many 0 coefs
+mat.model = df.model %>%
+  dplyr::select(-cost.per.sqft) %>%
+  as.matrix()
+constraint.reg.result = nnls::nnls(A=mat.model, b=df.model$cost.per.sqft)
