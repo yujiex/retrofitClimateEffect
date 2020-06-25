@@ -5,6 +5,10 @@ library("dplyr")
 ## ratio: percent of subsample points in mid and late-century
 violin.distribution.untreated <- function(df.plot.control, imagename,
                                           image.width, ratio=0.1) {
+  title.string = sprintf("Effect distribution for the un-retrofitted under %s over different period", toupper(target.scenario))
+  if (image.width < 5) {
+    title.string = stringr::str_wrap(title.string, width=45)
+  }
   points.now = df.plot.control %>%
     dplyr::filter(period == "now") %>%
     {.}
@@ -35,10 +39,9 @@ violin.distribution.untreated <- function(df.plot.control, imagename,
     ggplot2::ylab("Probability Density") +
     ggplot2::theme_bw() +
     ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
-    ggplot2::ggtitle(sprintf("Effect distribution for the un-retrofitted under %s over different period", toupper(target.scenario))) +
+    ggplot2::ggtitle(title.string) +
     ggplot2::theme(legend.position="bottom",
                     axis.text.x=element_blank(),
-                    ## axis.text.x=element_text(size=5),
                     strip.text.x = element_text(size = 7),
                     plot.title=element_text(size=11))
   ggplot2::ggsave(imagename,
@@ -569,7 +572,7 @@ if (stringr::str_detect(kw, "detaillevel")) {
 if (stringr::str_detect(kw, "detaillevel")) {
   ## for detailed action pairs
   dfs.detailed.action = df.label %>%
-    dplyr::filter(n>20) %>%
+    ## dplyr::filter(n>20) %>%
     tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
     dplyr::filter(l2 != "NA") %>%
     dplyr::group_by(l1, l3, fuel) %>%
@@ -581,7 +584,8 @@ if (stringr::str_detect(kw, "detaillevel")) {
     {.}
   print(length(dfs.detailed.action))
   for (target.scenario in c("rcp45", "rcp85")) {
-    for (stacked in c(TRUE, FALSE)) {
+    for (stacked in c(TRUE)) {
+      ## for (stacked in c(TRUE, FALSE)) {
       lapply(dfs.detailed.action, function(action.to.plot) {
         image.suf <- paste(action.to.plot$l1[[1]], action.to.plot$l3[[1]], sep= "_")
         image.suf <- gsub(" ", "-", image.suf)
@@ -590,13 +594,14 @@ if (stringr::str_detect(kw, "detaillevel")) {
           tidyr::unite("action", l2:l3) %>%
           dplyr::mutate(action = gsub("_NA", "", action)) %>%
           dplyr::mutate(period = NA) %>%
+          dplyr::mutate(action = gsub("_", " ", action)) %>%
           {.}
         df.insample = cf.result %>%
           dplyr::filter(period == "now", scenario == "measured",
                         is.real.retrofit == 0) %>%
           dplyr::mutate(scenario = target.scenario) %>%
           {.}
-        df.plot = cf.result %>%
+        df.plot.control = cf.result %>%
           dplyr::filter(scenario == target.scenario) %>%
           dplyr::filter(is.real.retrofit==0) %>%
           dplyr::bind_rows(df.insample) %>%
@@ -611,35 +616,44 @@ if (stringr::str_detect(kw, "detaillevel")) {
           ## annual
           dplyr::mutate(predictions = (-1)*predictions * 12) %>%
           dplyr::mutate(action = gsub("_NA", "", action)) %>%
+          dplyr::mutate(action = gsub("_", " ", action)) %>%
           dplyr::arrange(period) %>%
           {.}
         if (stacked) {
-          imagename =
-            sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s_stack.png",
-                    imagedir, image.suf, target.scenario, kw)
-          df.plot %>%
-            ggplot2::ggplot(ggplot2::aes(x=predictions,
-                                        fill=period,
-                                        color=period,
-                                        group=interaction(action, fuel, period))) +
-            ggplot2::geom_density(alpha=0.2, size=0.4) +
-            ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-            ggplot2::facet_grid(fuel ~ action) +
-            ggplot2::theme_bw() +
-            ggplot2::ggtitle(sprintf("Effect distribution on the retrofitted under %s",
-                                    toupper(target.scenario))) +
-            ggplot2::scale_fill_brewer(palette=pal) +
-            ggplot2::scale_color_brewer(palette=pal) +
-            ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-            ggplot2::ylab("Probability density") +
-            ggplot2::coord_flip() +
-            ggplot2::theme(legend.position="bottom",
-                          axis.text.x = element_text(size=6),
-                          strip.text.x = element_text(size = 7),
-                          plot.title = element_text(size = 11),
-                          legend.text = element_text(size=6))
-            ggplot2::theme()
-          ggplot2::ggsave(imagename, width=4, height=4)
+          if (plotkind == "vio") {
+            imagename =
+              sprintf("%s/retrofit_effect_cf_control_slides_vio_%s_%s_%s_stack.png",
+                      imagedir, image.suf, target.scenario, kw)
+            violin.distribution.untreated(df.plot.control, imagename,
+                                          image.width=4, ratio=0.1)
+          } else {
+            imagename =
+              sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s_stack.png",
+                      imagedir, image.suf, target.scenario, kw)
+            df.plot.control %>%
+              ggplot2::ggplot(ggplot2::aes(x=predictions,
+                                          fill=period,
+                                          color=period,
+                                          group=interaction(action, fuel, period))) +
+              ggplot2::geom_density(alpha=0.2, size=0.4) +
+              ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+              ggplot2::facet_grid(fuel ~ action) +
+              ggplot2::theme_bw() +
+              ggplot2::ggtitle(sprintf("Effect distribution on the retrofitted under %s",
+                                      toupper(target.scenario))) +
+              ggplot2::scale_fill_brewer(palette=pal) +
+              ggplot2::scale_color_brewer(palette=pal) +
+              ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+              ggplot2::ylab("Probability density") +
+              ggplot2::coord_flip() +
+              ggplot2::theme(legend.position="bottom",
+                            axis.text.x = element_text(size=6),
+                            strip.text.x = element_text(size = 7),
+                            plot.title = element_text(size = 11),
+                            legend.text = element_text(size=6))
+              ggplot2::theme()
+            ggplot2::ggsave(imagename, width=4, height=4)
+          }
         } else {
           allactions = unique(df.plot$action)
           lapply(allactions, function(target.action) {
