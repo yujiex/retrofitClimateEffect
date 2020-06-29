@@ -57,9 +57,9 @@ pal = "Dark2"
 
 suf = "_measured_input"
 
-## kw = "toplevel_bp"
+kw = "toplevel_bp"
 ## kw = "highlevel_bp"
-kw = "detaillevel_bp"
+## kw = "detaillevel_bp"
 ## kw = "joint_highlevel_bp"
 kw = paste0(kw, suf)
 
@@ -1254,12 +1254,6 @@ for (target.scenario in c("rcp45", "rcp85")) {
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 ## Compare savings distribution in a summary table
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
-
-kw = "toplevel_bp"
-## kw = "highlevel_bp"
-## kw = "detaillevel_bp"
-## kw = "joint_highlevel_bp"
-
 for (kw in
      c("toplevel_bp", "highlevel_bp", "detaillevel_bp", "joint_highlevel_bp")) {
   cf.result.cmip5 = readr::read_csv(sprintf("%s/grf_result_fewcol_%s.csv", tabledir, kw)) %>%
@@ -1303,10 +1297,42 @@ for (kw in
       {.}
   }
   to.summarise %>%
-    dplyr::group_by(fuel, action, period, scenario, input.source) %>%
+    dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+    dplyr::group_by(fuel, action, period, scenario, is.real.retrofit,
+                    input.source) %>%
     dplyr::summarise_at(vars(predictions),
                         tibble::lst(min, mean, median, max, sd)) %>%
     dplyr::ungroup() %>%
     ## tidyr::pivot_wider(names_from=input.source, values_from=min:sd) %>%
     readr::write_csv(sprintf("savings_cmip5_vs_noaa_%s.csv", kw))
+}
+
+## output summary table to document
+for (kw in
+     c("toplevel_bp", "highlevel_bp", "joint_highlevel_bp", "detaillevel_bp")) {
+  kw = "detaillevel_bp"
+  summaryfile = readr::read_csv(sprintf("savings_cmip5_vs_noaa_%s.csv", kw)) %>%
+    {.}
+  if (kw == "detaillevel_bp") {
+    summaryfile <- summaryfile %>%
+      tidyr::separate(action, into=c("action", "l2", "l3"), sep="_") %>%
+      tidyr::unite(col="sub action", l2, l3, sep=" ") %>%
+      dplyr::mutate(`sub action`=gsub("NA", "", `sub action`)) %>%
+      {.}
+  }
+  summaryfile %>%
+    dplyr::filter(period == "now", is.real.retrofit == 1,
+                  input.source == "noaa") %>%
+    dplyr::select(-scenario, -period, -input.source, -is.real.retrofit) %>%
+    dplyr::distinct() %>%
+    dplyr::mutate_at(vars(min:sd), function(x) {round(x, 2)}) %>%
+    readr::write_csv(sprintf("savings_treated_%s.csv", kw))
+  summaryfile %>%
+    dplyr::filter(period != "now", is.real.retrofit == 0,
+                  input.source == "noaa") %>%
+    dplyr::select(-input.source, -is.real.retrofit) %>%
+    dplyr::distinct() %>%
+    dplyr::arrange(fuel, action, `sub action`, period, scenario) %>%
+    dplyr::mutate_at(vars(min:sd), function(x) {round(x, 2)}) %>%
+    readr::write_csv(sprintf("savings_control_%s.csv", kw))
 }
