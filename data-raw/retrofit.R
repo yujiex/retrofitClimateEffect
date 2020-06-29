@@ -162,9 +162,6 @@ usethis::use_data(retrofit_prev_actions_toplevel, overwrite = T)
 retrofit_prev_actions_detaillevel = get.prev.action(data=retro_long_detail, colname="high.and.detail")
 usethis::use_data(retrofit_prev_actions_detaillevel, overwrite = T)
 
-load("../data/retrofit.alldata.rda")
-load("../data/energy_monthly_web_withloc.rda")
-
 ## 6 months implementation time for these buildings and gsalink
 single.commissioning = retro_long %>%
   dplyr::group_by(`Building_Number`, `Substantial_Completion_Date`) %>%
@@ -194,6 +191,8 @@ time.retro = retro_long_adj_time %>%
   dplyr::distinct(`Building_Number`, `Substantial_Completion_Date`, short.implement) %>%
   dplyr::rename(BLDGNUM = `Building_Number`) %>%
   {.}
+
+load("../data/energy_monthly_web_withloc.rda")
 
 ## energy for retrofitted buildings
 energydata.retro = energy_monthly_web_withloc %>%
@@ -490,34 +489,41 @@ leed.lookup <- leed.lookup %>%
   dplyr::distinct(Building_Number, Action, time) %>%
   {.}
 
-with.leed.pre.retro <- retro_long %>%
-  dplyr::distinct(Building_Number, Substantial_Completion_Date) %>%
-  dplyr::filter(Building_Number %in% unique(retrofit.avg.energy.enough.data$BLDGNUM)) %>%
-  dplyr::left_join(leed.lookup, by="Building_Number") %>%
-  dplyr::filter(difftime(Substantial_Completion_Date, time, "days") > 365) %>%
-  dplyr::distinct(Building_Number, Substantial_Completion_Date) %>%
-  dplyr::mutate(with.leed = T) %>%
+with.leed.retro <- retrofit.avg.energy.enough.data %>%
+  dplyr::distinct(BLDGNUM, Substantial_Completion_Date) %>%
+  dplyr::inner_join(leed.lookup, by=c("BLDGNUM"="Building_Number")) %>%
+  {.}
+
+with.leed.pre.retro = with.leed.retro %>%
+  dplyr::filter(difftime(Substantial_Completion_Date, time, "days") > 0) %>%
+  dplyr::distinct(BLDGNUM, Substantial_Completion_Date) %>%
+  dplyr::mutate(with.leed.pre = T) %>%
+  {.}
+
+with.leed.post.retro = with.leed.retro %>%
+  dplyr::filter(difftime(Substantial_Completion_Date, time, "days") <= 0) %>%
+  dplyr::distinct(BLDGNUM, Substantial_Completion_Date) %>%
+  dplyr::mutate(with.leed.post = T) %>%
   {.}
 
 retrofit.avg.energy.enough.data <- retrofit.avg.energy.enough.data %>%
-  dplyr::left_join(with.leed.pre.retro, by=c("BLDGNUM"="Building_Number",
-                                             "Substantial_Completion_Date"="Substantial_Completion_Date")) %>%
-  dplyr::mutate(with.leed = ifelse(is.na(with.leed), F, with.leed)) %>%
+  dplyr::left_join(with.leed.pre.retro, by=c("BLDGNUM", "Substantial_Completion_Date")) %>%
+  dplyr::mutate(with.leed.pre = ifelse(is.na(with.leed.pre), F, with.leed.pre)) %>%
+  dplyr::left_join(with.leed.post.retro, by=c("BLDGNUM", "Substantial_Completion_Date")) %>%
+  dplyr::mutate(with.leed.post = ifelse(is.na(with.leed.post), F, with.leed.post)) %>%
   {.}
 
 retrofit.avg.energy.enough.data %>%
-  dplyr::distinct(BLDGNUM, is.real.retrofit, with.leed) %>%
-  dplyr::group_by(is.real.retrofit, with.leed) %>%
+  dplyr::distinct(BLDGNUM, is.real.retrofit, with.leed.pre) %>%
+  dplyr::group_by(is.real.retrofit, with.leed.pre) %>%
   dplyr::summarise(n()) %>%
   dplyr::ungroup()
 
 retrofit.avg.energy.enough.data %>%
-  dplyr::distinct(BLDGNUM, is.real.retrofit, with.leed) %>%
-  dplyr::filter(with.leed, is.real.retrofit) %>%
-  dplyr::left_join(leed.lookup, by=c("BLDGNUM"="Building_Number")) %>%
-  dplyr::select(-with.leed, -is.real.retrofit) %>%
-  dplyr::arrange(BLDGNUM, time) %>%
-  readr::write_csv("temp.csv")
+  dplyr::distinct(BLDGNUM, is.real.retrofit, with.leed.post) %>%
+  dplyr::group_by(is.real.retrofit, with.leed.post) %>%
+  dplyr::summarise(n()) %>%
+  dplyr::ungroup()
 
 usethis::use_data(retrofit.avg.energy.enough.data, overwrite = T)
 
@@ -787,6 +793,8 @@ retrofit.alldata %>%
 
 usethis::use_data(retrofit.alldata, overwrite = T)
 
+load("../data/retrofit.alldata.rda")
+
 ## check weather station distance
 weather.files = list.files("weather_data/ghcnd_by_building_retrofit/", "_TMIN.csv")
 result = lapply(weather.files, function(f) {
@@ -833,8 +841,6 @@ df.tmax %>%
 ## Mean   : 5.9659   Mean   :33.22
 ## 3rd Qu.: 8.0524   3rd Qu.:40.75
 ## Max.   :31.4303   Max.   :98.42
-
-load("../data/retrofit.alldata.rda")
 
 to.estimate = retrofit.alldata %>%
   dplyr::filter(retro.status == "pre") %>%
