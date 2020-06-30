@@ -12,6 +12,8 @@ load("../data/retrofit_prev_actions_detaillevel.rda")
 
 load("../data/non.action.data.rda")
 
+load("../data/non.action.data.binary.rda")
+
 options(tibble.width=NULL)
 
 ## compare results under different climate scenario
@@ -22,7 +24,7 @@ load("../data/cmip5.bin.period.threeyear.rda")
 ## prev.action: df with previous action
 ## fuel.and.other: df with other fields
 ## kw: key words in file naming
-fit.cf <- function(prev.action, fuel.and.other, kw, projected.weather=TRUE, bound.propensity=TRUE) {
+fit.cf <- function(prev.action, fuel.and.other, yvarname, kw, projected.weather=TRUE, bound.propensity=TRUE) {
   if (bound.propensity) {
     kw = paste0(kw, "_bp")
   }
@@ -39,7 +41,7 @@ fit.cf <- function(prev.action, fuel.and.other, kw, projected.weather=TRUE, boun
       {.}
   } else {
     dfs.by.fuel = fuel.and.other %>%
-      ## use climate projected now to build model
+      ## use measured weather to build model
       dplyr::filter(model == "measured") %>%
       dplyr::group_by(variable, model, scenario) %>%
       dplyr::group_split() %>%
@@ -70,10 +72,11 @@ fit.cf <- function(prev.action, fuel.and.other, kw, projected.weather=TRUE, boun
         dplyr::select(-variable) %>%
         {.}
       X = df.allfeature %>%
-        select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -eui.diff, -model, -scenario) %>%
+        dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -model, -scenario) %>%
+        dplyr::select(-yvarname) %>%
         as.matrix() %>%
         {.}
-      Y = df.allfeature$eui.diff
+      Y = df.allfeature[[yvarname]]
       W = df.allfeature$is.real.retrofit
       c.forest.initial <- grf::causal_forest(X, Y, W)
       ## bound treatment probability
@@ -101,7 +104,8 @@ fit.cf <- function(prev.action, fuel.and.other, kw, projected.weather=TRUE, boun
       ## use all climate scenario
       X.new <- new.data %>%
         dplyr::select(-period, -model, -scenario) %>%
-        dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -eui.diff) %>%
+        dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`) %>%
+        dplyr::select(-yvarname) %>%
         dplyr::select(GROSSSQFT:htdd, `<10`:`>90`, everything()) %>%
         as.matrix() %>%
         {.}
@@ -131,6 +135,9 @@ fit.cf <- function(prev.action, fuel.and.other, kw, projected.weather=TRUE, boun
   } else {
     suf = "_measured_input"
   }
+  if (yvarname == "with.leed.post") {
+    suf = paste0(suf, "_", "leed")
+  }
   output.result = dfs.result.prediction %>%
     dplyr::bind_rows() %>%
     {.}
@@ -146,28 +153,44 @@ fit.cf <- function(prev.action, fuel.and.other, kw, projected.weather=TRUE, boun
     readr::write_csv(sprintf("../tables/grf_var_importance_%s%s.csv", kw, suf))
 }
 
+## predicts energy
 ## output retrofit effect estimates
 set.seed(0)
-fit.cf(retrofit_prev_actions_highlevel, non.action.data, "highlevel")
+fit.cf(retrofit_prev_actions_highlevel, non.action.data, yvarname="eui.diff", kw="highlevel")
 
 set.seed(0)
-fit.cf(retrofit_prev_actions_toplevel, non.action.data, "toplevel")
+fit.cf(retrofit_prev_actions_toplevel, non.action.data, yvarname="eui.diff", "toplevel")
 
 set.seed(0)
-fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data, "joint_highlevel")
+fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data, yvarname="eui.diff", "joint_highlevel")
 
 set.seed(0)
-fit.cf(retrofit_prev_actions_detaillevel, non.action.data, "detaillevel")
+fit.cf(retrofit_prev_actions_detaillevel, non.action.data, yvarname="eui.diff", "detaillevel")
 
 ## use NOAA measured input
 set.seed(0)
-fit.cf(retrofit_prev_actions_highlevel, non.action.data, "highlevel", projected.weather=FALSE, bound.propensity=TRUE)
+fit.cf(retrofit_prev_actions_highlevel, non.action.data, yvarname="eui.diff", "highlevel", projected.weather=FALSE, bound.propensity=TRUE)
 
 set.seed(0)
-fit.cf(retrofit_prev_actions_toplevel, non.action.data, "toplevel", projected.weather=FALSE, bound.propensity=TRUE)
+fit.cf(retrofit_prev_actions_toplevel, non.action.data, yvarname="eui.diff", "toplevel", projected.weather=FALSE, bound.propensity=TRUE)
 
 set.seed(0)
-fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data, "joint_highlevel", projected.weather=FALSE, bound.propensity=TRUE)
+fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data, yvarname="eui.diff", "joint_highlevel", projected.weather=FALSE, bound.propensity=TRUE)
 
 set.seed(0)
-fit.cf(retrofit_prev_actions_detaillevel, non.action.data, "detaillevel", projected.weather=FALSE, bound.propensity=TRUE)
+fit.cf(retrofit_prev_actions_detaillevel, non.action.data, yvarname="eui.diff", "detaillevel", projected.weather=FALSE, bound.propensity=TRUE)
+
+## predict binary leed
+## output retrofit effect estimates
+set.seed(0)
+fit.cf(retrofit_prev_actions_highlevel, non.action.data.binary, yvarname="with.leed.post", kw="highlevel", projected.weather=FALSE, bound.propensity=TRUE)
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_toplevel, non.action.data.binary, yvarname="with.leed.post", "toplevel", projected.weather=FALSE, bound.propensity=TRUE)
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data.binary, yvarname="with.leed.post", "joint_highlevel", projected.weather=FALSE, bound.propensity=TRUE)
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_detaillevel, non.action.data.binary, yvarname="with.leed.post", "detaillevel", projected.weather=FALSE, bound.propensity=TRUE)
+
