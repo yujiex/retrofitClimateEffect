@@ -44,6 +44,16 @@ non.action.data = pre.nonenergy %>%
   dplyr::left_join(pre.energy, by=c("BLDGNUM", "is.real.retrofit", "Substantial_Completion_Date")) %>%
   dplyr::left_join(eui.diff.total, by=c("BLDGNUM", "is.real.retrofit", "Substantial_Completion_Date")) %>%
   dplyr::filter(variable %in% c("KWHR", "GAS")) %>%
+  dplyr::select(-with.leed.post) %>%
   {.}
 
 usethis::use_data(non.action.data, overwrite = T)
+
+non.action.data.binary = pre.nonenergy %>%
+  dplyr::filter(!with.leed.pre) %>%
+  dplyr::left_join(pre.energy, by=c("BLDGNUM", "is.real.retrofit", "Substantial_Completion_Date")) %>%
+  dplyr::select(-with.leed.pre) %>%
+  dplyr::mutate(variable = "leed") %>%
+  {.}
+
+usethis::use_data(non.action.data.binary, overwrite=T)
