@@ -22,7 +22,7 @@
 \usepackage{fancyvrb}
 % \usepackage{lipsum}
 \usepackage{booktabs}
-% \usepackage{multirow}
+\usepackage{multirow}
 % \usepackage{pdflscape}
 \usepackage{float}
 % \usepackage{minted}
@@ -60,12 +60,84 @@
 \maketitle
 \tableofcontents
 \newpage
-\section{Density of the treated under current climate}
+\section{Effect on electricity and gas consumption}
+\subsection{Result summary table}
+In the subsection, the estimated retrofit effect on electricity and gas
+consumption is reported, the effect are in terms of annual average consumption
+savings in kBtu/sqft/year. The positive values means savings.
+\subsubsection{Treated}
+\input{../tables/summary_treated_Electricity_toplevel_bp}
+\input{../tables/summary_treated_Electricity_joint_highlevel_bp}
+\input{../tables/summary_treated_Electricity_highlevel_bp}
+\input{../tables/summary_treated_Electricity_detaillevel_bp}
+\input{../tables/summary_treated_Gas_toplevel_bp}
+\input{../tables/summary_treated_Gas_joint_highlevel_bp}
+\input{../tables/summary_treated_Gas_highlevel_bp}
+\input{../tables/summary_treated_Gas_detaillevel_bp}
+\subsubsection{Untreated under mid-century RCP4.5}
+\input{../tables/summary_control_Electricity_mid-century_RCP45_toplevel_bp}
+\input{../tables/summary_control_Electricity_mid-century_RCP45_joint_highlevel_bp}
+\input{../tables/summary_control_Electricity_mid-century_RCP45_highlevel_bp}
+\input{../tables/summary_control_Electricity_mid-century_RCP45_detaillevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP45_toplevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP45_joint_highlevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP45_highlevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP45_detaillevel_bp}
+\subsubsection{Untreated under mid-century RCP8.5}
+\input{../tables/summary_control_Electricity_mid-century_RCP85_toplevel_bp}
+\input{../tables/summary_control_Electricity_mid-century_RCP85_joint_highlevel_bp}
+\input{../tables/summary_control_Electricity_mid-century_RCP85_highlevel_bp}
+\input{../tables/summary_control_Electricity_mid-century_RCP85_detaillevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP85_toplevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP85_joint_highlevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP85_highlevel_bp}
+\input{../tables/summary_control_Gas_mid-century_RCP85_detaillevel_bp}
+\subsection{Density of the treated under current climate}
 \input{../images/cf_treated_noaa}
-\section{Stacked density of the non-treated for different climate period}
+\subsection{Stacked density of the non-treated for different climate period under RCP4.5}
 \input{../images/cf_control_noaa_rcp45_stack}
-\section{Individual density per model-scenario of the non-treated for different climate period}
+\subsection{Individual density per model-scenario of the non-treated for different
+  climate period under RCP4.5}
 \input{../images/cf_control_noaa_rcp45}
+\subsection{Stacked density of the non-treated for different climate period under RCP8.5}
+\input{../images/cf_control_noaa_rcp85_stack}
+\subsection{Individual density per model-scenario of the non-treated for different
+  climate period under RCP8.5}
+\input{../images/cf_control_noaa_rcp85}
+\section{Effect on obtaining LEED after retrofit}
+\subsection{Result summary table}
+In the subsection, the estimated retrofit effect on obtaining LEED
+is reported, the effect are in terms of average ratio of buildings obtaining
+LEED after retrofit. The larger the number, the more likely the building tends
+to obtain LEED after retrofits.
+\subsubsection{Treated}
+\input{../tables/summary_treated_leed_toplevel_bp}
+\input{../tables/summary_treated_leed_joint_highlevel_bp}
+\input{../tables/summary_treated_leed_highlevel_bp}
+\input{../tables/summary_treated_leed_detaillevel_bp}
+\subsubsection{Untreated under mid-century RCP4.5}
+\input{../tables/summary_control_leed_mid-century_RCP45_toplevel_bp}
+\input{../tables/summary_control_leed_mid-century_RCP45_joint_highlevel_bp}
+\input{../tables/summary_control_leed_mid-century_RCP45_highlevel_bp}
+\input{../tables/summary_control_leed_mid-century_RCP45_detaillevel_bp}
+\subsubsection{Untreated under mid-century RCP8.5}
+\input{../tables/summary_control_leed_mid-century_RCP85_toplevel_bp}
+\input{../tables/summary_control_leed_mid-century_RCP85_joint_highlevel_bp}
+\input{../tables/summary_control_leed_mid-century_RCP85_highlevel_bp}
+\input{../tables/summary_control_leed_mid-century_RCP85_detaillevel_bp}
+\subsection{Density of the treated under current climate}
+\input{../images/cf_treated_noaa_leed}
+\subsection{Stacked density of the non-treated for different climate period under RCP4.5}
+\input{../images/cf_control_noaa_rcp45_leed_stack}
+\subsection{Individual density per model-scenario of the non-treated for different
+  climate period under RCP4.5}
+\input{../images/cf_control_noaa_rcp45_leed}
+\subsection{Stacked density of the non-treated for different climate period under RCP8.5}
+\input{../images/cf_control_noaa_rcp85_leed_stack}
+\subsection{Individual density per model-scenario of the non-treated for different
+  climate period under RCP8.5}
+\input{../images/cf_control_noaa_rcp85_leed}
+
 % \newpage
 % \bibliographystyle{plain}
 % \bibliography{myCitation}
