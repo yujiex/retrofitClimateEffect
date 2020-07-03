@@ -1,5 +1,6 @@
 library("ggplot2")
 library("dplyr")
+library("kableExtra")
 
 ## helpers
 ## ratio: percent of subsample points in mid and late-century
@@ -19,6 +20,11 @@ violin.distribution.untreated <- function(df.plot.control, imagename,
     dplyr::ungroup() %>%
     dplyr::bind_rows(points.now) %>%
     {.}
+  if (stringr::str_detect(imagename, "_leed")) {
+    ylabtext = "Estimated retrofit effect on LEED"
+  } else {
+    ylabtext = "Estimated effect (kBtu/sqft/year)"
+  }
   df.plot.control %>%
     ggplot2::ggplot(ggplot2::aes(x = period, y=predictions, fill=period,
                                   group = interaction(action, period))) +
@@ -36,9 +42,8 @@ violin.distribution.untreated <- function(df.plot.control, imagename,
     ggplot2::facet_grid(fuel~action) +
     ggplot2::scale_fill_brewer(palette = pal) +
     ggplot2::scale_color_brewer(palette = pal) +
-    ggplot2::ylab("Probability Density") +
+    ggplot2::ylab(ylabtext) +
     ggplot2::theme_bw() +
-    ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
     ggplot2::ggtitle(title.string) +
     ggplot2::theme(legend.position="bottom",
                     axis.text.x=element_blank(),
@@ -55,11 +60,13 @@ tabledir = "~/Dropbox/thesis/code/retrofitClimateEffect/tables"
 ## color palette for the plot of different time period
 pal = "Dark2"
 
-suf = "_measured_input"
+## suf = "_measured_input"
+suf = "_measured_input_leed"
+plotkind = "vio"
 
-kw = "toplevel_bp"
+## kw = "toplevel_bp"
 ## kw = "highlevel_bp"
-## kw = "detaillevel_bp"
+kw = "detaillevel_bp"
 ## kw = "joint_highlevel_bp"
 kw = paste0(kw, suf)
 
@@ -102,32 +109,43 @@ df.plot.treated = cf.result %>%
                   "Building Tuneup or Utility Improvements"="Commissioning") %>%
   dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
                   "GAS"="Gas", "KWHR"="Electricity") %>%
-  ## annual
-  dplyr::mutate(predictions = (-1)*predictions * 12) %>%
   {.}
-
+if (!stringr::str_detect(kw, "_leed")) {
+  df.plot.treated <- df.plot.treated %>%
+    ## annual
+    dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+    {.}
+}
 if (stringr::str_detect(kw, "highlevel_bp")) {
   df.plot.treated <- df.plot.treated %>%
     dplyr::mutate(action = factor(action, levels = c("Advanced Metering", "GSALink", "Commissioning", "Building Envelope", "HVAC", "Lighting"))) %>%
     {.}
-  if (plotkind == "vio") {
-    image.width = 8
-    image.height = 6
-  } else {
-    image.height = 4
-    image.width = 8
-  }
-} else if (stringr::str_detect(kw, "toplevel_bp")) {
-  image.width = 6
 }
 if (plotkind == "vio") {
-  if (stringr::str_detect(kw, "highlevel_bp")) {
-    num.row = 2
+  if (stringr::str_detect(kw, "_leed")) {
+    titletext = "Effect distribution on LEED for the retrofitted \nwith measured weather input"
+    ylabtext = "Estimated retrofit effect on LEED"
   } else {
+    titletext = "Effect distribution on energy for the retrofitted \nwith measured weather input"
+    ylabtext = "Estimated retrofit effect (kBtu/sqft/year)"
+  }
+  if (stringr::str_detect(kw, "highlevel_bp")) {
+    image.width = 8
+    image.height = 6
+    num.row = 2
+    if (leed.suf == "_leed") {
+      image.width = 8
+      image.height = 4
+    }
+  } else {
+    image.width = 6
+    image.height = 4
     num.row = 1
   }
   imagename = sprintf("%s/retrofit_effect_cf_treated_slides_vio_%s.png",
                       imagedir, kw)
+  print(image.width)
+  print(image.height)
   df.plot.treated %>%
     ggplot2::ggplot(ggplot2::aes(x = action, y=predictions,
                                  group=interaction(action, fuel),
@@ -142,15 +160,22 @@ if (plotkind == "vio") {
                        mapping=ggplot2::aes(x = action, y = 0, label=action.label),
                        hjust = -0.5, vjust = 1.2) +
     ggplot2::theme_bw() +
-    ggplot2::ggtitle("Effect distribution for the retrofitted with measured weather input") +
-    ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-    ggplot2::ylab("Probability density") +
+    ggplot2::ggtitle(titletext) +
+    ggplot2::ylab(ylabtext) +
     ggplot2::theme(legend.position="bottom",
                    axis.text.x = element_text(size=6),
                    strip.text.x = element_text(size = 7))
   ggplot2::ggsave(imagename, width=image.width, height=image.height)
 } else {
   image.height = 4
+  if (stringr::str_detect(kw, "_leed")) {
+    titletext = "Effect distribution on LEED for the retrofitted \nwith measured weather input"
+    xlabtext = "Estimated retrofit effect on LEED"
+  } else {
+    titletext = "Effect distribution on energy for the retrofitted \nwith measured weather input"
+    xlabtext = "Estimated retrofit effect (kBtu/sqft/year)"
+  }
+  ylabtext = "Probability density"
   imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s.png",
                       imagedir, kw)
   df.plot.treated %>%
@@ -164,9 +189,9 @@ if (plotkind == "vio") {
                       mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
                       hjust = -0.5, vjust = 1.2) +
     ggplot2::theme_bw() +
-    ggplot2::ggtitle("Effect distribution for the retrofitted with measured weather input") +
-    ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-    ggplot2::ylab("Probability density") +
+    ggplot2::ggtitle(titletext) +
+    ggplot2::xlab(xlabtext) +
+    ggplot2::ylab(ylabtext) +
     ggplot2::coord_flip() +
     ggplot2::theme(legend.position="bottom",
                   axis.text.x = element_text(size=6),
@@ -244,13 +269,25 @@ for (target.scenario in c("rcp45", "rcp85")) {
                        "Building Tuneup or Utility Improvements"="Commissioning") %>%
       dplyr::mutate_at(dplyr::vars(fuel), dplyr::recode,
                        "GAS"="Gas", "KWHR"="Electricity") %>%
-      dplyr::mutate(predictions = (-1)*predictions * 12) %>%
       {.}
+    if (!stringr::str_detect(kw, "_leed")) {
+      df.plot.control <- df.plot.control %>%
+        ## annual
+        dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+        {.}
+    }
     if (stacked) {
-      if (kw == "highlevel_bp") {
+      if (stringr::str_detect(kw, "highlevel_bp")) {
         image.width = 8
-      } else if (kw == "toplevel_bp") {
+      } else if (stringr::str_detect(kw, "toplevel_bp")) {
         image.width = 6
+      }
+      if (stringr::str_detect(kw, "_leed")) {
+        titletext = sprintf("Effect distribution on LEED for the un-retrofitted \nunder %s over different period", toupper(target.scenario))
+        ylabtext = "Estimated retrofit effect on LEED"
+      } else {
+        titletext = sprintf("Effect distribution on energy for the un-retrofitted \nunder %s over different period", toupper(target.scenario))
+        ylabtext = "Estimated retrofit effect (kBtu/sqft/year)"
       }
       if (plotkind == "vio") {
         imagename = sprintf("%s/retrofit_effect_cf_control_slides_vio_%s_%s_stack.png", imagedir, target.scenario, kw)
@@ -259,6 +296,7 @@ for (target.scenario in c("rcp45", "rcp85")) {
                                       ratio=0.1)
       } else {
         imagename = sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_stack.png", imagedir, target.scenario, kw)
+        xlabtext = ylabtext
         df.plot.control %>%
           ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period, color=period,
                                        group=interaction(action, fuel, period))) +
@@ -270,9 +308,8 @@ for (target.scenario in c("rcp45", "rcp85")) {
           ggplot2::ylab("Probability Density") +
           ggplot2::coord_flip() +
           ggplot2::theme_bw() +
-          ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
-          ggplot2::ggtitle(sprintf("Effect distribution for the un-retrofitted under %s over different period",
-                                  toupper(target.scenario))) +
+          ggplot2::xlab(xlabtext) +
+          ggplot2::ggtitle(titletext) +
           ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
                         strip.text.x = element_text(size = 7),
                         plot.title=element_text(size=11))
@@ -280,11 +317,18 @@ for (target.scenario in c("rcp45", "rcp85")) {
                           width=image.width, height=4)
       }
     } else {
-      actions = unique(cf.result$action)
       image.width = 6
+      actions = unique(cf.result$action)
       lapply(actions, function(target.action) {
         if (target.action =="Building Tuneup or Utility Improvements") {
           target.action = "Commissioning"
+        }
+        if (stringr::str_detect(kw, "_leed")) {
+          titletext = sprintf("%s effect distribution on LEED for the un-retrofitted \nunder %s over different period", target.action, toupper(target.scenario))
+          xlabtext = "Estimated retrofit effect on LEED"
+        } else {
+          titletext = sprintf("%s effect distribution on energy for the un-retrofitted \nunder %s over different period", target.action, toupper(target.scenario))
+          xlabtext = "Estimated retrofit effect (kBtu/sqft/year)"
         }
         df.plot.control %>%
           dplyr::filter(action == target.action) %>%
@@ -300,12 +344,16 @@ for (target.scenario in c("rcp45", "rcp85")) {
           ggplot2::coord_flip() +
           ## ggplot2::coord_flip(ylim=c(0, 3)) +
           ggplot2::theme_bw() +
-          ggplot2::ggtitle(sprintf("%s effect distribution for the un-retrofitted under %s over different period",
-                                  target.action, toupper(target.scenario))) +
-          ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
-          ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
-                        strip.text.x = element_text(size = 7),
-                        plot.title=element_text(size=9))
+          ggplot2::ggtitle(titletext) +
+          ggplot2::xlab(xlabtext) +
+          ## ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
+          ##               strip.text.x = element_text(size = 7),
+          ##               plot.title=element_text(size=9))
+          ggplot2::theme(legend.position="bottom",
+                        axis.text.x = element_text(size=6),
+                        strip.text.x = element_text(size = 6),
+                        plot.title = element_text(size = 10),
+                        legend.text = element_text(size=6))
         ## many models
         imagename = sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s.png",
                             imagedir, target.action, target.scenario, kw)
@@ -429,9 +477,21 @@ if (stringr::str_detect(kw, "detaillevel")) {
       dplyr::inner_join(action.to.plot %>% dplyr::select(-model), by=c("l1", "l2", "l3", "fuel")) %>%
       tidyr::unite("action", l2:l3) %>%
       ## annual
-      dplyr::mutate(predictions = (-1)*predictions * 12) %>%
       dplyr::mutate(action = gsub("_NA", "", action)) %>%
       {.}
+    if (!stringr::str_detect(kw, "_leed")) {
+      df.plot.treated <- df.plot.treated %>%
+        ## annual
+        dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+        {.}
+    }
+    if (stringr::str_detect(kw, "_leed")) {
+      titletext = "Effect distribution on LEED for the retrofitted \nwith measured weather input"
+      ylabtext = "Estimated retrofit effect on LEED"
+    } else {
+      titletext = "Effect distribution on energy for the retrofitted \nwith measured weather input"
+      ylabtext = "Estimated retrofit effect (kBtu/sqft/year)"
+    }
     if (plotkind == "vio") {
       df.label.oneaction <- df.label.oneaction %>%
         dplyr::mutate(action = gsub("_", " ", action)) %>%
@@ -454,9 +514,8 @@ if (stringr::str_detect(kw, "detaillevel")) {
                            mapping=ggplot2::aes(x = action, y = 0, label=action.label),
                            hjust = -0.5, vjust = 1.2) +
         ggplot2::theme_bw() +
-        ggplot2::ggtitle("Effect distribution on the retrofitted with measured weather input") +
-        ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-        ggplot2::ylab("Probability density") +
+        ggplot2::ggtitle(titletext) +
+        ggplot2::ylab(ylabtext) +
         ggplot2::theme(legend.position="bottom",
                        legend.text = element_text(size = 8),
                        ## axis.text.x = element_text(size=6),
@@ -464,6 +523,7 @@ if (stringr::str_detect(kw, "detaillevel")) {
                        strip.text.x = element_text(size = 7),
                        plot.title = element_text(size = 8))
     } else {
+      xlabtext = ylabtext
       imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s_%s.png",
                           imagedir, image.suf, kw)
       df.plot.treated %>%
@@ -476,8 +536,8 @@ if (stringr::str_detect(kw, "detaillevel")) {
                            mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
                            hjust = -0.5, vjust = 1.2) +
         ggplot2::theme_bw() +
-        ggplot2::ggtitle("Effect distribution on the retrofitted with measured weather input") +
-        ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+        ggplot2::ggtitle(titletext) +
+        ggplot2::xlab(xlabtext) +
         ggplot2::ylab("Probability density") +
         ggplot2::coord_flip() +
         ggplot2::theme(legend.position="bottom",
@@ -584,8 +644,7 @@ if (stringr::str_detect(kw, "detaillevel")) {
     {.}
   print(length(dfs.detailed.action))
   for (target.scenario in c("rcp45", "rcp85")) {
-    for (stacked in c(TRUE)) {
-      ## for (stacked in c(TRUE, FALSE)) {
+    for (stacked in c(TRUE, FALSE)) {
       lapply(dfs.detailed.action, function(action.to.plot) {
         image.suf <- paste(action.to.plot$l1[[1]], action.to.plot$l3[[1]], sep= "_")
         image.suf <- gsub(" ", "-", image.suf)
@@ -613,13 +672,24 @@ if (stringr::str_detect(kw, "detaillevel")) {
           tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
           dplyr::inner_join(action.to.plot %>% dplyr::select(-model), by=c("l1", "l2", "l3", "fuel")) %>%
           tidyr::unite("action", l2:l3) %>%
-          ## annual
-          dplyr::mutate(predictions = (-1)*predictions * 12) %>%
           dplyr::mutate(action = gsub("_NA", "", action)) %>%
           dplyr::mutate(action = gsub("_", " ", action)) %>%
           dplyr::arrange(period) %>%
           {.}
+        if (!stringr::str_detect(kw, "_leed")) {
+          df.plot.control <- df.plot.control %>%
+            ## annual
+            dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+            {.}
+        }
         if (stacked) {
+          if (stringr::str_detect(kw, "_leed")) {
+            titletext = sprintf("Effect distribution on LEED for the un-retrofitted \nunder %s over different period", toupper(target.scenario))
+            ylabtext = "Estimated retrofit effect on LEED"
+          } else {
+            titletext = sprintf("Effect distribution on energy for the un-retrofitted \nunder %s over different period", toupper(target.scenario))
+            ylabtext = "Estimated retrofit effect (kBtu/sqft/year)"
+          }
           if (plotkind == "vio") {
             imagename =
               sprintf("%s/retrofit_effect_cf_control_slides_vio_%s_%s_%s_stack.png",
@@ -639,12 +709,10 @@ if (stringr::str_detect(kw, "detaillevel")) {
               ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
               ggplot2::facet_grid(fuel ~ action) +
               ggplot2::theme_bw() +
-              ggplot2::ggtitle(sprintf("Effect distribution on the retrofitted under %s",
-                                      toupper(target.scenario))) +
+              ggplot2::ggtitle(titletext) +
               ggplot2::scale_fill_brewer(palette=pal) +
               ggplot2::scale_color_brewer(palette=pal) +
-              ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-              ggplot2::ylab("Probability density") +
+              ggplot2::ylab(ylabtext) +
               ggplot2::coord_flip() +
               ggplot2::theme(legend.position="bottom",
                             axis.text.x = element_text(size=6),
@@ -655,13 +723,20 @@ if (stringr::str_detect(kw, "detaillevel")) {
             ggplot2::ggsave(imagename, width=4, height=4)
           }
         } else {
-          allactions = unique(df.plot$action)
+          allactions = unique(df.plot.control$action)
           lapply(allactions, function(target.action) {
             imagename =
               sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s.png",
                       imagedir, gsub(" / ", "-or-", target.action), target.scenario, kw)
             imagename <- gsub(" ", "-", imagename)
-            df.plot %>%
+            if (stringr::str_detect(kw, "_leed")) {
+              titletext = sprintf("%s effect distribution on LEED \nfor the un-retrofitted under %s over different period", gsub("_", "", target.action), toupper(target.scenario))
+              xlabtext = "Estimated retrofit effect on LEED"
+            } else {
+              titletext = sprintf("%s effect distribution on energy \nfor the un-retrofitted under %s over different period", gsub("_", "", target.action), toupper(target.scenario))
+              xlabtext = "Estimated retrofit effect (kBtu/sqft/year)"
+            }
+            df.plot.control %>%
               dplyr::filter(action == target.action) %>%
               ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period, color=period,
                                         group=interaction(action, fuel, model,
@@ -670,21 +745,18 @@ if (stringr::str_detect(kw, "detaillevel")) {
               ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
               ggplot2::facet_grid(fuel ~ period) +
               ggplot2::theme_bw() +
-              ggplot2::labs(title = gsub("_", " ", target.action),
-                            subtitle = sprintf("Effect distribution on the retrofitted under %s",
-                                               toupper(target.scenario))) +
+              ggplot2::ggtitle(titletext) +
               ggplot2::scale_fill_brewer(palette=pal) +
               ggplot2::scale_color_brewer(palette=pal) +
-              ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+              ggplot2::xlab(xlabtext) +
               ggplot2::ylab("Probability density") +
               ggplot2::coord_flip() +
               ggplot2::theme(legend.position="bottom",
-                            axis.text.x = element_text(size=6),
-                            strip.text.x = element_text(size = 6),
-                            plot.title = element_text(size = 11),
-                            legend.text = element_text(size=6))
-              ggplot2::theme()
-            ggplot2::ggsave(imagename, width=4, height=4)
+                             axis.text.x = element_text(size=6),
+                             strip.text.x = element_text(size = 6),
+                             plot.title = element_text(size = 10),
+                             legend.text = element_text(size=6))
+            ggplot2::ggsave(imagename, width=6, height=4)
             return(NULL)
           })
         }
@@ -840,10 +912,14 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
     dplyr::mutate(action = gsub("Lighting", "L", action)) %>%
     dplyr::inner_join(joint.to.plot %>% dplyr::select(-model),
                       by=c("action", "fuel")) %>%
-    ## annual
-    dplyr::mutate(predictions = (-1)*predictions * 12) %>%
     dplyr::mutate(action = gsub("_NA", "", action)) %>%
     {.}
+  if (!stringr::str_detect(kw, "_leed")) {
+    df.plot <- df.plot %>%
+      ## annual
+      dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+      {.}
+  }
 }
 
 ## distributions of the treated under current climate, using NOAA inputs
@@ -852,6 +928,15 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
     dplyr::filter(is.real.retrofit==1) %>%
     dplyr::filter(period == "now") %>%
     {.}
+  if (stringr::str_detect(kw, "_leed")) {
+    titletext = "Effect distribution on LEED for the retrofitted \nwith measured weather input"
+    ylabtext = "Estimated retrofit effect on LEED"
+    image.width = 4
+  } else {
+    titletext = "Effect distribution on energy for the retrofitted \nwith measured weather input"
+    ylabtext = "Estimated retrofit effect (kBtu/sqft/year)"
+    image.width = 6
+  }
   if (plotkind == "vio") {
     imagename = sprintf("%s/retrofit_effect_cf_treated_slides_vio_%s.png", imagedir, kw)
     df.plot.treated %>%
@@ -867,17 +952,18 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
                          mapping=ggplot2::aes(x = action, y = 0, label=action.label),
                          hjust = -0.5, vjust = 1.2) +
       ggplot2::theme_bw() +
-      ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
-      ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
-      ggplot2::ylab("Probability density") +
+      ggplot2::ggtitle(titletext) +
+      ggplot2::ylab(ylabtext) +
+      guides(fill=ggplot2::guide_legend(ncol=2)) +
       ggplot2::theme(legend.position="bottom",
-                      axis.text.x = element_text(size=6),
-                      strip.text.x = element_text(size = 7),
-                      plot.title = element_text(size = 12))
-    ggplot2::ggsave(imagename, width=6, height=4)
+                     axis.text.x = element_text(size=6),
+                     strip.text.x = element_text(size = 7),
+                     plot.title = element_text(size = 12))
+    ggplot2::ggsave(imagename, width=image.width, height=4)
   } else {
     imagename = sprintf("%s/retrofit_effect_cf_treated_slides_%s.png", imagedir, kw)
     linesize = 0.4
+    xlabtext = ylabtext
     df.plot.treated %>%
       ggplot2::ggplot(ggplot2::aes(x=predictions,
                                   group=interaction(action, fuel))) +
@@ -890,15 +976,15 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
                         mapping=ggplot2::aes(x = Inf, y = -Inf, label=action.label),
                         hjust = -0.5, vjust = 1.2) +
       ggplot2::theme_bw() +
-      ggplot2::ggtitle("Distribution of treatment effect for the retrofitted") +
-      ggplot2::xlab("Estimated retrofit effect (kBtu/sqft/year)") +
+      ggplot2::ggtitle(titletext) +
+      ggplot2::xlab(xlabtext) +
       ggplot2::ylab("Probability density") +
       ggplot2::coord_flip() +
       ggplot2::theme(legend.position="bottom",
                       axis.text.x = element_text(size=6),
                       strip.text.x = element_text(size = 7),
                       plot.title = element_text(size = 12))
-    ggplot2::ggsave(imagename, width=6, height=4)
+    ggplot2::ggsave(imagename, width=image.width, height=4)
   }
 }
 
@@ -963,9 +1049,22 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
                                     levels=c("now", "mid-century",
                                              "late-century"))) %>%
       {.}
-    if (plotkind == "density") {
-      for (stacked in c(TRUE, FALSE)) {
-        if (stacked) {
+    if (stringr::str_detect(kw, "_leed")) {
+      titletext = sprintf("Effect distribution on LEED for the un-retrofitted \nunder %s over different period", toupper(target.scenario))
+      ylabtext = "Estimated retrofit effect on LEED"
+    } else {
+      titletext = sprintf("Effect distribution on energy for the un-retrofitted \nunder %s over different period", toupper(target.scenario))
+      ylabtext = "Estimated retrofit effect (kBtu/sqft/year)"
+    }
+    for (stacked in c(TRUE, FALSE)) {
+      if (stacked) {
+        if (plotkind == "vio") {
+          imagename = sprintf("%s/retrofit_effect_cf_control_slides_vio_%s_%s_stack.png", imagedir, target.scenario, kw)
+          set.seed(0)
+          violin.distribution.untreated(df.plot.control, imagename, image.width=6,
+                                        ratio=0.1)
+        } else {
+          xlabtext = ylabtext
           df.plot.control %>%
             ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period, color=period,
                                         group=interaction(action, fuel, period))) +
@@ -977,53 +1076,52 @@ if (stringr::str_detect(kw, "joint_highlevel")) {
             ggplot2::ylab("Probability Density") +
             ggplot2::coord_flip() +
             ggplot2::theme_bw() +
-            ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
-            ggplot2::ggtitle(sprintf("Effect distribution for the un-retrofitted under %s over different period",
-                                    toupper(target.scenario))) +
+            ggplot2::xlab(xlabtext) +
+            ggplot2::ggtitle(titletext) +
             ggplot2::theme(legend.position="bottom", axis.text.x=element_text(size=5),
                           strip.text.x = element_text(size = 7),
                           plot.title=element_text(size=11))
           ggplot2::ggsave(sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_stack.png",
                                   imagedir, target.scenario, kw),
                           width=image.width, height=4)
-        } else {
-          actions = unique(df.plot$action)
-          image.width = 6
-          lapply(actions, function(target.action) {
-            imagename = sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s.png",
-                                imagedir, target.action, target.scenario, kw)
-            imagename <- gsub(" & ", "-", imagename)
-            df.plot.control %>%
-              dplyr::filter(action == target.action) %>%
-              ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
-                                          color=period,
-                                          group=interaction(action, fuel, model, period))) +
-              ggplot2::geom_density(alpha=0.2, size=0.2) +
-              ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
-              ggplot2::facet_grid(fuel ~ period) +
-              ggplot2::scale_fill_brewer(palette = pal) +
-              ggplot2::scale_color_brewer(palette = pal) +
-              ggplot2::ylab("Probability Density") +
-              ggplot2::coord_flip() +
-              ## ggplot2::coord_flip(ylim=c(0, 3)) +
-              ggplot2::theme_bw() +
-              ggplot2::ggtitle(sprintf("%s effect distribution for the un-retrofitted under %s over different period",
-                                      target.action, toupper(target.scenario))) +
-              ggplot2::xlab("Estimated effect (kBtu/sqft/year)") +
-              ggplot2::theme(legend.position="bottom",
-                            axis.text.x=element_text(size=5),
-                            strip.text.x = element_text(size = 7),
-                            plot.title=element_text(size=9))
-            ggplot2::ggsave(imagename,
-                            width=image.width, height=4)
-          })
         }
+      } else {
+        xlabtext = ylabtext
+        actions = unique(df.plot$action)
+        image.width = 6
+        lapply(actions, function(target.action) {
+          imagename = sprintf("%s/retrofit_effect_cf_control_slides_%s_%s_%s.png",
+                              imagedir, target.action, target.scenario, kw)
+          imagename <- gsub(" & ", "-", imagename)
+          if (stringr::str_detect(kw, "_leed")) {
+            titletext = sprintf("%s effect distribution on LEED for the un-retrofitted \nunder %s over different period", target.action, toupper(target.scenario))
+          } else {
+            titletext = sprintf("%s effect distribution on energy for the un-retrofitted \nunder %s over different period", target.action, toupper(target.scenario))
+          }
+          df.plot.control %>%
+            dplyr::filter(action == target.action) %>%
+            ggplot2::ggplot(ggplot2::aes(x=predictions, fill=period,
+                                        color=period,
+                                        group=interaction(action, fuel, model, period))) +
+            ggplot2::geom_density(alpha=0.2, size=0.2) +
+            ggplot2::geom_vline(xintercept=0, linetype = "dashed") +
+            ggplot2::facet_grid(fuel ~ period) +
+            ggplot2::scale_fill_brewer(palette = pal) +
+            ggplot2::scale_color_brewer(palette = pal) +
+            ggplot2::ylab("Probability Density") +
+            ggplot2::coord_flip() +
+            ## ggplot2::coord_flip(ylim=c(0, 3)) +
+            ggplot2::theme_bw() +
+            ggplot2::ggtitle(titletext) +
+            ggplot2::xlab(xlabtext) +
+            ggplot2::theme(legend.position="bottom",
+                          axis.text.x=element_text(size=5),
+                          strip.text.x = element_text(size = 7),
+                          plot.title=element_text(size=9))
+          ggplot2::ggsave(imagename,
+                          width=image.width, height=4)
+        })
       }
-    } else {
-      imagename = sprintf("%s/retrofit_effect_cf_control_slides_vio_%s_%s_stack.png", imagedir, target.scenario, kw)
-      set.seed(0)
-      violin.distribution.untreated(df.plot.control, imagename, image.width=6,
-                                    ratio=0.1)
     }
   }
 }
@@ -1116,7 +1214,7 @@ df.label = cf.result %>%
   {.}
 
 action.detail = df.label %>%
-  dplyr::filter(n>20) %>%
+  ## dplyr::filter(n>20) %>%
   tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
   dplyr::filter(l2 != "NA") %>%
   dplyr::group_by(l1, l3, fuel) %>%
@@ -1134,10 +1232,10 @@ suf.actions.detail = action.detail %>%
   {.}
 
 suf.actions.detail.subaction = action.detail %>%
-  dplyr::mutate(imagesuf = paste0(l2, "_", l3)) %>%
+  dplyr::mutate(imagesuf = paste0(l2, "-", l3)) %>%
   dplyr::mutate(imagesuf = gsub(" / ", "-or-", imagesuf)) %>%
   dplyr::mutate(imagesuf = gsub(" ", "-", imagesuf)) %>%
-  dplyr::mutate(imagesuf = gsub("_NA", "", imagesuf)) %>%
+  dplyr::mutate(imagesuf = gsub("-NA", "", imagesuf)) %>%
   dplyr::distinct(imagesuf) %>%
   .$imagesuf %>%
   {.}
@@ -1199,67 +1297,104 @@ for (target.scenario in c("rcp45", "rcp85")) {
 ## generate file for the results of models learned from noaa imputs
 ## treated
 treat.status = "treated"
-images = sprintf("retrofit_effect_cf_%s_slides_%s.png", treat.status, c("toplevel_bp_measured_input", "highlevel_bp_measured_input", "joint_highlevel_bp_measured_input"))
-## detailed action
-images <- c(images, sprintf("retrofit_effect_cf_%s_slides_%s_detaillevel_bp_measured_input.png", treat.status, suf.actions.detail))
-## generate image tex file
-contents = sapply(images, function(imagei) {
-  newlines <- c("\\begin{figure}[H]",
-                "\\centering",
-                sprintf("\\includegraphics[width=0.9\\linewidth]{../images/%s}",
-                        imagei),
-                "\\end{figure}")
-  return(newlines)
-})
-con <- file(sprintf("../images/cf_%s_noaa.tex", treat.status), open = "w+")
-writeLines(contents, con, sep = "\n", useBytes = FALSE)
-close(con)
+for (leed.suf in c("", "_leed")) {
+  images = sprintf("retrofit_effect_cf_%s_slides_vio_%s%s.png", treat.status, c("toplevel_bp_measured_input", "highlevel_bp_measured_input", "joint_highlevel_bp_measured_input"), leed.suf)
+  ## detailed action
+  ## generate image tex file
+  contents = sapply(images, function(imagei) {
+    newlines <- c("\\begin{figure}[H]",
+                  "\\centering",
+                  sprintf("\\includegraphics[width=0.9\\linewidth]{../images/%s}",
+                          imagei),
+                  "\\end{figure}")
+    return(newlines)
+  })
+  detail.images <- c(sprintf("retrofit_effect_cf_%s_slides_vio_%s_detaillevel_bp_measured_input%s.png", treat.status, suf.actions.detail, leed.suf))
+  detail.contents = sapply(detail.images, function(imagei) {
+    newlines <- c("\\begin{figure}[H]",
+                  "\\centering",
+                  ## thinner width for detail level analysis
+                  sprintf("\\includegraphics[width=0.6\\linewidth]{../images/%s}",
+                          imagei),
+                  "\\end{figure}")
+    return(newlines)
+  })
+  con <- file(sprintf("../images/cf_%s_noaa%s.tex", treat.status, leed.suf), open = "w+")
+  writeLines(c(contents, detail.contents), con, sep = "\n", useBytes = FALSE)
+  close(con)
+}
 
 ## control
 treat.status = "control"
-for (target.scenario in c("rcp45", "rcp85")) {
-  for (stack.suf in c("_stack", "")) {
-    if (stack.suf == "_stack") {
-      images = sprintf("retrofit_effect_cf_%s_slides_%s_%s%s.png", treat.status, target.scenario, c("toplevel_bp_measured_input", "highlevel_bp_measured_input", "joint_highlevel_bp_measured_input"), stack.suf)
-      ## detailed action
-      images <- c(images, sprintf("retrofit_effect_cf_%s_slides_%s_%s_detaillevel_bp_measured_input%s.png", treat.status, suf.actions.detail, target.scenario, stack.suf))
-    } else {
-      images = c(sprintf("retrofit_effect_cf_%s_slides_%s_%s_toplevel_bp_measured_input%s.png",
-                         treat.status, suf.actions.toplevel, target.scenario,
-                         stack.suf), sprintf("retrofit_effect_cf_%s_slides_%s_%s_highlevel_bp_measured_input%s.png",
-                                             treat.status, suf.actions.highlevel, target.scenario,
-                                             stack.suf),
-                 sprintf("retrofit_effect_cf_%s_slides_%s_%s_joint_highlevel_bp_measured_input%s.png",
-                         treat.status, suf.actions.jointhighlevel,
-                         target.scenario, stack.suf),
-                 sprintf("retrofit_effect_cf_%s_slides_%s_%s_detaillevel_bp_measured_input%s.png",
-                         treat.status, suf.actions.detail.subaction,
-                         target.scenario, stack.suf))
+for (leed.suf in c("", "_leed")) {
+  for (target.scenario in c("rcp45", "rcp85")) {
+    for (stack.suf in c("_stack", "")) {
+      if (stack.suf == "_stack") {
+        images = sprintf("retrofit_effect_cf_%s_slides_vio_%s_%s%s%s.png", treat.status, target.scenario, c("toplevel_bp_measured_input", "highlevel_bp_measured_input", "joint_highlevel_bp_measured_input"), leed.suf, stack.suf)
+        ## detailed action
+        detail.images <- sprintf("retrofit_effect_cf_%s_slides_vio_%s_%s_detaillevel_bp_measured_input%s%s.png", treat.status, suf.actions.detail, target.scenario, leed.suf, stack.suf)
+        ## generate image tex file
+        contents = sapply(images, function(imagei) {
+          newlines <- c("\\begin{figure}[H]",
+                        "\\centering",
+                        sprintf("\\includegraphics[width=0.9\\linewidth]{../images/%s}",
+                                imagei),
+                        "\\end{figure}")
+          return(newlines)
+        })
+        detail.contents = sapply(detail.images, function(imagei) {
+          newlines <- c("\\begin{figure}[H]",
+                        "\\centering",
+                        sprintf("\\includegraphics[width=0.6\\linewidth]{../images/%s}",
+                                imagei),
+                        "\\end{figure}")
+          return(newlines)
+        })
+        print(tail(detail.contents))
+        contents <- c(contents, detail.contents)
+      } else {
+        images = c(sprintf("retrofit_effect_cf_%s_slides_%s_%s_toplevel_bp_measured_input%s%s.png",
+                          treat.status, suf.actions.toplevel, target.scenario, leed.suf,
+                          stack.suf),
+                  sprintf("retrofit_effect_cf_%s_slides_%s_%s_highlevel_bp_measured_input%s%s.png",
+                                              treat.status, suf.actions.highlevel, target.scenario,
+                                              leed.suf, stack.suf),
+                  sprintf("retrofit_effect_cf_%s_slides_%s_%s_joint_highlevel_bp_measured_input%s%s.png",
+                          treat.status, suf.actions.jointhighlevel,
+                          target.scenario, leed.suf, stack.suf),
+                  sprintf("retrofit_effect_cf_%s_slides_%s_%s_detaillevel_bp_measured_input%s%s.png",
+                          treat.status, suf.actions.detail.subaction,
+                          target.scenario, leed.suf, stack.suf))
+        ## generate image tex file
+        contents = sapply(images, function(imagei) {
+          newlines <- c("\\begin{figure}[H]",
+                        "\\centering",
+                        sprintf("\\includegraphics[width=0.9\\linewidth]{../images/%s}",
+                                imagei),
+                        "\\end{figure}")
+          return(newlines)
+        })
+      }
+      con <- file(sprintf("../images/cf_%s_noaa_%s%s%s.tex", treat.status, target.scenario, leed.suf, stack.suf), open = "w+")
+      writeLines(contents, con, sep = "\n", useBytes = FALSE)
+      close(con)
     }
-    ## generate image tex file
-    contents = sapply(images, function(imagei) {
-      newlines <- c("\\begin{figure}[H]",
-                    "\\centering",
-                    sprintf("\\includegraphics[width=0.9\\linewidth]{../images/%s}",
-                            imagei),
-                    "\\end{figure}")
-      return(newlines)
-    })
-    con <- file(sprintf("../images/cf_%s_noaa_%s%s.tex", treat.status, target.scenario, stack.suf), open = "w+")
-    writeLines(contents, con, sep = "\n", useBytes = FALSE)
-    close(con)
   }
 }
 
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
 ## Compare savings distribution in a summary table
 ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## ## Summary of energy
+## leed.suf = ""
+## Summary of leed
+leed.suf = "_leed"
 for (kw in
      c("toplevel_bp", "highlevel_bp", "detaillevel_bp", "joint_highlevel_bp")) {
-  cf.result.cmip5 = readr::read_csv(sprintf("%s/grf_result_fewcol_%s.csv", tabledir, kw)) %>%
+  cf.result.cmip5 = readr::read_csv(sprintf("%s/grf_result_fewcol_%s%s.csv", tabledir, kw, leed.suf)) %>%
     dplyr::mutate(input.source = "cmip5") %>%
     {.}
-  cf.result.noaa = readr::read_csv(sprintf("%s/grf_result_fewcol_%s_measured_input.csv", tabledir, kw)) %>%
+  cf.result.noaa = readr::read_csv(sprintf("%s/grf_result_fewcol_%s_measured_input%s.csv", tabledir, kw, leed.suf)) %>%
     dplyr::mutate(input.source = "noaa") %>%
     {.}
   in.sample = cf.result.noaa %>%
@@ -1296,43 +1431,136 @@ for (kw in
                                   "C & H & L")) %>%
       {.}
   }
+  if (leed.suf == "") {
+    to.summarise <- to.summarise %>%
+      dplyr::mutate(predictions = (-1)*predictions * 12) %>%
+      {.}
+  }
   to.summarise %>%
-    dplyr::mutate(predictions = (-1)*predictions * 12) %>%
     dplyr::group_by(fuel, action, period, scenario, is.real.retrofit,
                     input.source) %>%
     dplyr::summarise_at(vars(predictions),
                         tibble::lst(min, mean, median, max, sd)) %>%
     dplyr::ungroup() %>%
     ## tidyr::pivot_wider(names_from=input.source, values_from=min:sd) %>%
-    readr::write_csv(sprintf("savings_cmip5_vs_noaa_%s.csv", kw))
+    readr::write_csv(sprintf("savings_cmip5_vs_noaa_%s%s.csv", kw, leed.suf))
 }
 
 ## output summary table to document
-for (kw in
-     c("toplevel_bp", "highlevel_bp", "joint_highlevel_bp", "detaillevel_bp")) {
-  kw = "detaillevel_bp"
-  summaryfile = readr::read_csv(sprintf("savings_cmip5_vs_noaa_%s.csv", kw)) %>%
-    {.}
-  if (kw == "detaillevel_bp") {
-    summaryfile <- summaryfile %>%
-      tidyr::separate(action, into=c("action", "l2", "l3"), sep="_") %>%
-      tidyr::unite(col="sub action", l2, l3, sep=" ") %>%
-      dplyr::mutate(`sub action`=gsub("NA", "", `sub action`)) %>%
+for (leed.suf in c("", "_leed")) {
+  for (kw in
+      c("toplevel_bp", "highlevel_bp", "joint_highlevel_bp", "detaillevel_bp")) {
+    kw = paste0(kw, leed.suf)
+    summaryfile = readr::read_csv(sprintf("savings_cmip5_vs_noaa_%s.csv", kw))
+    if (stringr::str_detect(kw, "detaillevel_bp")) {
+      summaryfile <- summaryfile %>%
+        tidyr::separate(action, into=c("action", "l2", "l3"), sep="_") %>%
+        tidyr::unite(col="sub action", l2, l3, sep=" ") %>%
+        dplyr::mutate(`sub action`=gsub("NA", "", `sub action`)) %>%
+        {.}
+    }
+    summary.treated <- summaryfile %>%
+      dplyr::filter(period == "now", is.real.retrofit == 1,
+                    input.source == "noaa") %>%
+      dplyr::select(-scenario, -period, -input.source, -is.real.retrofit) %>%
+      dplyr::distinct() %>%
+      dplyr::mutate_at(vars(min:sd), function(x) {round(x, 3)}) %>%
       {.}
+    summary.control <- summaryfile %>%
+      dplyr::filter(period != "now", is.real.retrofit == 0,
+                    input.source == "noaa") %>%
+      dplyr::select(-input.source, -is.real.retrofit) %>%
+      dplyr::distinct() %>%
+      dplyr::mutate_at(vars(min:sd), function(x) {round(x, 3)}) %>%
+      {.}
+    if (stringr::str_detect(kw, "detaillevel_bp")) {
+      summary.treated <- summary.treated %>%
+        dplyr::arrange(fuel, action, `sub action`) %>%
+        {.}
+      summary.control <- summary.control %>%
+        dplyr::arrange(fuel, action, `sub action`, period, scenario) %>%
+        {.}
+    } else {
+      summary.treated <- summary.treated %>%
+        dplyr::arrange(fuel, action) %>%
+        {.}
+      summary.control <- summary.control %>%
+        dplyr::arrange(fuel, action, period, scenario) %>%
+        {.}
+    }
+    summary.treated %>%
+      dplyr::rename(outcome = fuel) %>%
+      readr::write_csv(sprintf("savings_treated_%s.csv", kw))
+    summary.control %>%
+      dplyr::rename(outcome = fuel) %>%
+      readr::write_csv(sprintf("savings_control_%s.csv", kw))
   }
-  summaryfile %>%
-    dplyr::filter(period == "now", is.real.retrofit == 1,
-                  input.source == "noaa") %>%
-    dplyr::select(-scenario, -period, -input.source, -is.real.retrofit) %>%
-    dplyr::distinct() %>%
-    dplyr::mutate_at(vars(min:sd), function(x) {round(x, 2)}) %>%
-    readr::write_csv(sprintf("savings_treated_%s.csv", kw))
-  summaryfile %>%
-    dplyr::filter(period != "now", is.real.retrofit == 0,
-                  input.source == "noaa") %>%
-    dplyr::select(-input.source, -is.real.retrofit) %>%
-    dplyr::distinct() %>%
-    dplyr::arrange(fuel, action, `sub action`, period, scenario) %>%
-    dplyr::mutate_at(vars(min:sd), function(x) {round(x, 2)}) %>%
-    readr::write_csv(sprintf("savings_control_%s.csv", kw))
+}
+
+table.fontsize = 10
+for (treat.status in c("treated", "control")) {
+  for (leed.suf in c("", "_leed")) {
+    for (kw in
+        c("toplevel_bp", "highlevel_bp", "joint_highlevel_bp", "detaillevel_bp")) {
+      summary.input <- readr::read_csv(sprintf("savings_%s_%s%s.csv", treat.status, kw, leed.suf)) %>%
+        dplyr::mutate_at(dplyr::vars(action), dplyr::recode,
+                        "Building Tuneup or Utility Improvements"="Commissioning") %>%
+        {.}
+      if (treat.status == "treated") {
+        dfs = summary.input %>%
+          dplyr::group_by(outcome) %>%
+          dplyr::group_split() %>%
+          {.}
+      } else {
+        dfs = summary.input %>%
+          dplyr::group_by(outcome, period, scenario) %>%
+          dplyr::group_split() %>%
+          {.}
+      }
+      if (stringr::str_detect(kw, "detaillevel")) {
+        collapse.cols.end = 2
+        hline.option = "major"
+      } else {
+        collapse.cols.end = 1
+        hline.option = "none"
+      }
+      lapply(dfs, function(df.summary) {
+        out.var = df.summary$outcome[[1]]
+        if (leed.suf == "_leec") {
+          out.string = "LEED"
+        } else {
+          out.string = tolower(out.var)
+        }
+        if (treat.status == "treated") {
+          treat.string = "retrofitted"
+          period.string = "current"
+          out.filename = sprintf("../tables/summary_%s_%s_%s.tex", treat.status, out.var, kw)
+          period.scenario.string = period.string
+        } else {
+          treat.string = "un-retrofitted"
+          scenario.string = toupper(df.summary$scenario[[1]])
+          period.string = df.summary$period[[1]]
+          out.filename = sprintf("../tables/summary_%s_%s_%s_%s_%s.tex",
+                                treat.status, out.var, period.string, scenario.string, kw)
+          period.scenario.string = sprintf("%s (%s)", period.string, toupper(scenario.string))
+          df.summary <- df.summary %>%
+            dplyr::select(-scenario, -period)
+        }
+        captiontext = sprintf("Distribution of retrofit effect on %s on the %s, under the %s climate",
+                              out.string, treat.string, period.scenario.string)
+        sink(out.filename)
+        df.summary %>%
+          dplyr::select(-outcome) %>%
+          knitr::kable("latex", booktabs = T,
+                      format.args=list(big.mark=",", digits=3, scientific=F),
+                      caption=captiontext) %>%
+          kableExtra::kable_styling("striped", full_width = FALSE,
+                                    font_size = table.fontsize,
+                                    latex_options = "HOLD_position") %>%
+          kableExtra::collapse_rows(columns=1:collapse.cols.end, latex_hline=hline.option) %>%
+          print()
+        sink()
+      })
+    }
+  }
 }
