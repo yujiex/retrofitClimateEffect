@@ -154,6 +154,7 @@ fit.cf <- function(prev.action, fuel.and.other, yvarname, kw, projected.weather=
 }
 
 ## predicts energy
+## use CMIP5 inputs
 ## output retrofit effect estimates
 set.seed(0)
 fit.cf(retrofit_prev_actions_highlevel, non.action.data, yvarname="eui.diff", kw="highlevel")
@@ -166,6 +167,19 @@ fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data, yvarname="eui.dif
 
 set.seed(0)
 fit.cf(retrofit_prev_actions_detaillevel, non.action.data, yvarname="eui.diff", "detaillevel")
+
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_highlevel, non.action.data.binary, yvarname="with.leed.post", kw="highlevel")
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_toplevel, non.action.data.binary, yvarname="with.leed.post", "toplevel")
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data.binary, yvarname="with.leed.post", "joint_highlevel")
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_detaillevel, non.action.data.binary, yvarname="with.leed.post", "detaillevel")
 
 ## use NOAA measured input
 set.seed(0)
