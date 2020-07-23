@@ -67,6 +67,7 @@ non.energy.features = retrofit.alldata %>%
   {.}
 
 energy.features = retrofit.alldata %>%
+  dplyr::filter(scenario == "measured") %>%
   dplyr::filter(retro.status == "pre") %>%
   dplyr::select(BLDGNUM, `Substantial_Completion_Date`, is.real.retrofit, variable, mean.kbtu, GROSSSQFT) %>%
   dplyr::mutate(kbtu.per.sqft = mean.kbtu/GROSSSQFT) %>%
@@ -302,5 +303,135 @@ df.result %>%
                caption="Covariate balance of categorical features in the retrofit study") %>%
   kableExtra::kable_styling(full_width = FALSE, font_size = table.fontsize,
                             latex_options = "HOLD_position") %>%
+  print()
+sink()
+
+load("../data/non.action.data.lean.rda")
+
+lean.summary = non.action.data.lean %>%
+  dplyr::distinct(BLDGNUM, `Substantial_Completion_Date`, is.real.retrofit,
+                  baseload_GAS, baseload_KWHR, htcl_GAS, htcl_KWHR) %>%
+  tidyr::gather(variable, value, baseload_GAS:htcl_KWHR) %>%
+  dplyr::mutate(variable = variable * 12) %>%
+  dplyr::group_by(is.real.retrofit, variable) %>%
+  dplyr::summarise_at(vars(value), tibble::lst(mean, median, sd, min, max)) %>%
+  dplyr::ungroup() %>%
+  {.}
+
+## by elec and gas, annual
+energy.summary = retrofit.alldata %>%
+  ## change to annual summary
+  dplyr::mutate(kbtu.per.sqft = mean.kbtu/GROSSSQFT * 12) %>%
+  dplyr::filter(variable %in% c("GAS", "KWHR"), scenario == "measured") %>%
+  dplyr::filter(retro.status == "pre") %>%
+  dplyr::group_by(is.real.retrofit, variable) %>%
+  dplyr::summarise_at(vars(kbtu.per.sqft), tibble::lst(mean, median, sd, min, max)) %>%
+  dplyr::ungroup() %>%
+  {.}
+
+nonenergy.summary = retrofit.alldata %>%
+  dplyr::filter(retro.status == "pre") %>%
+  dplyr::filter(scenario == "measured") %>%
+  dplyr::distinct(BLDGNUM, `Substantial_Completion_Date`,
+                  is.real.retrofit, HDD, CDD, GROSSSQFT) %>%
+  tidyr::gather(variable, value, HDD:GROSSSQFT) %>%
+  dplyr::group_by(is.real.retrofit, variable) %>%
+  dplyr::summarise_at(vars(value), tibble::lst(mean, median, sd, min, max)) %>%
+  dplyr::ungroup() %>%
+  {.}
+
+energy.summary %>%
+  dplyr::bind_rows(nonenergy.summary) %>%
+  dplyr::bind_rows(lean.summary) %>%
+  dplyr::mutate(var.rank = case_when(variable == "KWHR" ~ 1,
+                                     variable == "GAS" ~ 2,
+                                     variable == "baseload_KWHR" ~ 3,
+                                     variable == "baseload_GAS" ~ 4,
+                                     variable == "htcl_KWHR" ~ 5,
+                                     variable == "htcl_GAS" ~ 6,
+                                     variable == "CDD" ~ 7,
+                                     variable == "HDD" ~ 8,
+                                     variable == "GROSSSQFT" ~ 9,
+                                     TRUE ~ 0)) %>%
+  dplyr::mutate_at(vars(variable), recode,
+                   "GROSSSQFT"="Gross Square Footage",
+                   "GAS" = "Gas (kBtu/sqft/year)",
+                   "KWHR" = "Electricity (kBtu/sqft/year)",
+                   "baseload_GAS" = "Baseload Gas (kBtu/sqft/year)",
+                   "baseload_KWHR" = "Baseload Electricity (kBtu/sqft/year)",
+                   "htcl_GAS" = "Heating/Cooling Gas (kBtu/sqft/year)",
+                   "htcl_KWHR" = "Heating/Cooling Electricity (kBtu/sqft/year)") %>%
+  dplyr::arrange(desc(is.real.retrofit), var.rank) %>%
+  dplyr::select(is.real.retrofit, var.rank, variable, min, mean, median, max, sd) %>%
+  readr::write_csv("numeric_summary.csv")
+
+load("../data/retrofit_prev_actions_toplevel.rda")
+load("../data/retrofit_prev_actions_highlevel.rda")
+load("../data/retrofit_prev_actions_joint_highlevel.rda")
+load("../data/retrofit_prev_actions_detaillevel.rda")
+
+retro.buildings = retrofit.alldata %>%
+  dplyr::filter(is.real.retrofit) %>%
+  dplyr::distinct(BLDGNUM, `Substantial_Completion_Date`)
+
+toplevel.count = retrofit_prev_actions_toplevel %>%
+  distinct(`Building_Number`, `target.action`, `target.date`) %>%
+  dplyr::inner_join(retro.buildings, by=c("Building_Number"="BLDGNUM",
+                                          "target.date"="Substantial_Completion_Date")) %>%
+  dplyr::group_by(target.action) %>%
+  dplyr::summarise(count=n()) %>%
+  dplyr::ungroup() %>%
+  {.}
+
+highlevel.count = retrofit_prev_actions_highlevel %>%
+  distinct(`Building_Number`, `target.action`, `target.date`) %>%
+  dplyr::inner_join(retro.buildings, by=c("Building_Number"="BLDGNUM",
+                                          "target.date"="Substantial_Completion_Date")) %>%
+  dplyr::group_by(target.action) %>%
+  dplyr::summarise(count=n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(highlevel = paste0(target.action, "(n=", count, ")")) %>%
+  dplyr::select(-count) %>%
+  dplyr::mutate(toplevel = ifelse(target.action %in% c("Building Envelope", "HVAC", "Lighting"), "Capital", "Operational")) %>%
+  dplyr::mutate(toplevel = ifelse(toplevel == "Capital",
+                                   paste0(toplevel, "(n=",
+                                          toplevel.count[[1,2]] + toplevel.count[[2,2]], ")"),
+                                  paste0(toplevel, "(n=",
+                                          toplevel.count[[3,2]] + toplevel.count[[2,2]], ")"))) %>%
+  {.}
+
+df.count = retrofit_prev_actions_detaillevel %>%
+  distinct(`Building_Number`, `target.action`, `target.date`) %>%
+  dplyr::inner_join(retro.buildings, by=c("Building_Number"="BLDGNUM",
+                                          "target.date"="Substantial_Completion_Date")) %>%
+  dplyr::group_by(target.action) %>%
+  dplyr::summarise(count=n()) %>%
+  dplyr::ungroup() %>%
+  tidyr::separate(target.action, into=c("l1", "l2", "l3"), sep="_") %>%
+  tidyr::unite("action", l2:l3) %>%
+  dplyr::mutate(action = gsub("_NA", "", action)) %>%
+  dplyr::mutate(action = gsub("_", " ", action)) %>%
+  dplyr::inner_join(highlevel.count, by=c("l1"="target.action")) %>%
+  dplyr::select(-l1) %>%
+  dplyr::select(toplevel, highlevel, action, count) %>%
+  dplyr::mutate(highlevel = gsub("Building Tuneup or Utility Improvement", "Commissioning", highlevel)) %>%
+  dplyr::arrange(toplevel, highlevel, action) %>%
+  dplyr::rename(`broad category`=`toplevel`,
+                `category`=`highlevel`,
+                `sub category`=action) %>%
+  {.}
+
+df.count %>%
+  readr::write_csv(sprintf("%s/retrofit_count_all.csv", tabledir))
+
+sink(sprintf("%s/retrofit_count_all.tex", tabledir))
+df.count %>%
+  knitr::kable("latex", booktabs = T,
+               caption="Building Count by Action Category") %>%
+  kableExtra::kable_styling("striped", full_width = FALSE,
+                            font_size = table.fontsize,
+                            latex_options = "HOLD_position") %>%
+  kableExtra::collapse_rows(columns=1:3, latex_hline="custom",
+                            custom_latex_hline = c(1,2)) %>%
   print()
 sink()
