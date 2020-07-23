@@ -28,7 +28,6 @@ compile.targeting.df <- function(df.no, df.yes, pre.energy, building.count) {
   return(to.plot)
 }
 
-
 ## compute the benefit of targeting
 
 load("../data/building_location.rda")
@@ -39,9 +38,9 @@ tabledir = "~/Dropbox/thesis/code/retrofitClimateEffect/tables"
 
 suf = "_measured_input"
 
-kw = "highlevel_bp"
+## kw = "highlevel_bp"
 ## kw = "detaillevel_bp"
-## kw = "toplevel_bp"
+kw = "toplevel_bp"
 ## kw = "joint_highlevel_bp"
 kw = paste0(kw, suf)
 
@@ -114,10 +113,13 @@ all.no.targeting %>%
 ## retrofit all buildings with all action, as the other two has overlaps in each
 ## action choice
 if (stringr::str_detect(kw, "highlevel") | stringr::str_detect(kw, "detail")) {
-
   to.plot = compile.targeting.df(all.no.targeting, all.with.targeting,
                                  pre.energy, building.count)
-
+  if (stringr::str_detect(kw, "highlevel")) {
+    mult = 1.4
+  } else {
+    mult = 1.5
+  }
   ## for all action
   dfs.to.plot = to.plot %>%
     dplyr::group_by(period, scenario) %>%
@@ -126,7 +128,7 @@ if (stringr::str_detect(kw, "highlevel") | stringr::str_detect(kw, "detail")) {
     target.period = df.to.plot$period[[1]]
     target.scenario = df.to.plot$scenario[[1]]
     scenario.str = ifelse(target.scenario == "measured", "", target.scenario)
-    lim = max(df.to.plot$mmbtu) * 1.4
+    lim = max(df.to.plot$mmbtu) * mult
     df.to.plot %>%
       dplyr::filter(scenario == target.scenario, period == target.period) %>%
       ggplot2::ggplot(ggplot2::aes(x=fuel.label, y=mmbtu, fill=interaction(label, fuel))) +
@@ -174,8 +176,8 @@ if (!stringr::str_detect(kw, "detail")) {
   } else {
     num.of.col = 2
     image.width = 7
-    image.height = 4
-    mult = 1.4
+    image.height = 6
+    mult = 1.5
   }
   if (stringr::str_detect(kw, "joint_highlevel")) {
     to.plot <- to.plot %>%
@@ -210,7 +212,8 @@ if (!stringr::str_detect(kw, "detail")) {
       ggplot2::scale_fill_manual(values=RColorBrewer::brewer.pal(8, "Paired")[1:4], name="") +
       ggplot2::facet_wrap(.~action, ncol=num.of.col) +
       ggplot2::coord_flip() +
-      ggplot2::geom_text(ggplot2::aes(label=targeting.label), hjust=1.05, position = position_dodge(0.9), lineheight = 0.7) +
+      ggplot2::geom_text(ggplot2::aes(label=targeting.label), hjust=1.05,
+                         position = position_dodge(0.9), lineheight = 0.7, size=3) +
       ## ggplot2::geom_text(ggplot2::aes(label=label), hjust=1.05, position = position_dodge(0.9), size=3) +
       ggplot2::expand_limits(y=lim) +
       ggplot2::scale_y_reverse() +
@@ -218,7 +221,7 @@ if (!stringr::str_detect(kw, "detail")) {
       ggplot2::theme(legend.position="none", title=element_text(size=9), axis.title.y=element_blank())
     ggplot2::ggsave(sprintf("%s/targeting_by_action_slides_%s_%s_%s.png", imagedir, target.period, target.scenario, kw), width=image.width, height=image.height)
   })
-} else if (stringr::str_detect(kw, "detail")) {
+} else {
   ## each l1 action in a plot
   ## leave only large-n actions
   ## filter actions with large enough n
@@ -256,9 +259,9 @@ if (!stringr::str_detect(kw, "detail")) {
       df.action <- df.action %>%
         dplyr::mutate_at(vars(action), recode, "Building / Facility"="Advanced Metering (Building / Facility)", "Submetering"="Advanced Metering (Submetering)")
     }
-    lim = max(df.action$mmbtu) * 1.5
+    lim = max(df.action$mmbtu) * 1.7
     n.action = length(unique(df.action$action))
-    image.height = round(n.action * 2/3, 1)
+    image.height = round(n.action * 0.9, 1)
     p <- df.action %>%
       ggplot2::ggplot(ggplot2::aes(x=fuel, y=mmbtu, fill=interaction(label, fuel), label=count)) +
       ggplot2::geom_bar(stat="identity", position="dodge") +
@@ -273,12 +276,15 @@ if (!stringr::str_detect(kw, "detail")) {
     }
     p +
       ggplot2::coord_flip() +
-      ggplot2::geom_text(ggplot2::aes(label=label), hjust=1.05, position = position_dodge(0.9), size=3) +
+      ## ggplot2::geom_text(ggplot2::aes(label=label), hjust=1.05, position = position_dodge(0.9), size=3) +
+      ggplot2::geom_text(ggplot2::aes(label=targeting.label), hjust=1.05,
+                         position = position_dodge(0.9), lineheight = 0.7, size=3) +
       ggplot2::expand_limits(y=lim) +
       ggplot2::scale_y_reverse() +
       ggplot2::ylab("MMBtu") +
       ggplot2::theme(legend.position="none", title=element_text(size=9), axis.title.y=element_blank())
-    ggplot2::ggsave(sprintf("%s/targeting_by_action_slides_%s_%s_%s_%s.png", imagedir, l1.action, target.period, target.scenario, kw), width=7, height=image.height)
+    ggplot2::ggsave(sprintf("%s/targeting_by_action_slides_%s_%s_%s_%s.png", imagedir, gsub(" ", "-", l1.action), target.period, target.scenario, kw),
+                    width=7, height=image.height)
   })
 }
 
@@ -442,9 +448,10 @@ top.level.ecm.lifespan = retrofit_from_db %>%
   dplyr::group_by(`Building_Number`, Substantial_Completion_Date) %>%
   dplyr::summarise(top_level_ECM = paste(top_level_ECM, collapse = " and ")) %>%
   dplyr::ungroup() %>%
-  dplyr::right_join(retroed.building.action.lifespan.toplevel) %>%
+  dplyr::right_join(retroed.building.action.lifespan.toplevel, by="Building_Number") %>%
   dplyr::group_by(top_level_ECM) %>%
   dplyr::summarise(lifespan.year = mean(lifespan.year)) %>%
+  dplyr::ungroup() %>%
   {.}
 
 building.action.roi = to.plot.roi %>%
@@ -481,8 +488,11 @@ all.no.targeting.roi = building.action.roi %>%
   dplyr::mutate(label = "No targeting") %>%
   {.}
 
+## only implement those with savings > implementation cost
 all.with.targeting.roi = building.action.roi %>%
-  dplyr::mutate(annual.value = ifelse(annual.value < 0, annual.value, 0)) %>%
+  dplyr::mutate(lose.money = (-1) * annual.value * lifespan.year < implement.cost) %>%
+  dplyr::mutate(annual.value = ifelse(lose.money, 0, annual.value),
+                implement.cost = ifelse(lose.money, 0, implement.cost)) %>%
   dplyr::mutate(label = "With targeting") %>%
   {.}
 
@@ -493,6 +503,9 @@ to.plot <- all.no.targeting.roi %>%
   dplyr::summarise(ROI = sum((-1) * annual.value * lifespan.year - implement.cost) / sum(implement.cost)) %>%
   dplyr::ungroup() %>%
   dplyr::mutate(variable="ROI") %>%
+  dplyr::mutate(target.label = paste0(label,
+                                      "\n", "ROI = ",
+                                      round(ROI, 1))) %>%
   {.}
 
 dfs.to.plot = to.plot %>%
@@ -510,7 +523,7 @@ lapply(dfs.to.plot, function(df.to.plot) {
     ggplot2::geom_bar(stat="identity", position="dodge") +
     ggplot2::ggtitle(sprintf("Targeting only the reducers \nvs all buildings taking all retrofits\n%s %s", target.period, scenario.str)) +
     ggplot2::scale_fill_manual(values=RColorBrewer::brewer.pal(8, "Paired")[5:6], name="") +
-    ggplot2::geom_text(ggplot2::aes(label=label), hjust=1.05,
+    ggplot2::geom_text(ggplot2::aes(label=target.label), hjust=1.05,
                        position = position_dodge(0.9)) +
     ggplot2::expand_limits(y=lim) +
     ggplot2::ylab("ROI") +
@@ -523,30 +536,27 @@ lapply(dfs.to.plot, function(df.to.plot) {
 ## plot by action
 to.plot.by.action <- all.no.targeting.roi %>%
   dplyr::bind_rows(all.with.targeting.roi) %>%
-  dplyr::group_by(scenario, period, label, action) %>%
+  dplyr::group_by(scenario, period, label, action, label) %>%
   dplyr::summarise(ROI = sum((-1) * annual.value * lifespan.year - implement.cost) / sum(implement.cost)) %>%
   dplyr::ungroup() %>%
   dplyr::mutate(variable="ROI") %>%
   {.}
+
+num.of.col = 3
 if (stringr::str_detect(kw, "toplevel")) {
-  num.of.col = 2
   image.width = 7
-  image.height = 2
+  image.height = 3
   mult = 2
-  to.plot.by.action <- to.plot.by.action %>%
-    dplyr::mutate(target.label = label) %>%
-    {.}
 } else if (stringr::str_detect(kw, "highlevel")){
-  num.of.col = 3
   image.width = 9
   image.height = 4
   mult = 1.9
-  to.plot.by.action <- to.plot.by.action %>%
-    dplyr::mutate(target.label = paste0(label,
-                                        "\n", "ROI = ",
-                                        round(ROI, 1))) %>%
-    {.}
 }
+to.plot.by.action <- to.plot.by.action %>%
+  dplyr::mutate(target.label = paste0(label,
+                                      "\n", "ROI = ",
+                                      round(ROI, 1))) %>%
+  {.}
 
 dfs.to.plot = to.plot.by.action %>%
   dplyr::group_by(period, scenario) %>%
@@ -574,3 +584,74 @@ lapply(dfs.to.plot, function(df.to.plot) {
                    axis.text.y=element_blank())
   ggplot2::ggsave(sprintf("%s/targeting_by_action_roi_%s_%s_%s.png", imagedir, target.period, target.scenario, kw), width=image.width, height=image.height)
 })
+
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## generate file for the results benefit from targeting, noaa input
+## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+## under current climate noaa input
+cf.fewcol.result = readr::read_csv(sprintf("%s/grf_result_fewcol_detaillevel_bp_measured_input.csv", tabledir))
+actions = cf.fewcol.result %>%
+  distinct(action) %>%
+  tidyr::separate(action, into=c("l1", "l2", "l3"), sep="_") %>%
+  dplyr::filter(l2 != "NA") %>%
+  dplyr::arrange(l1, l3, l2) %>%
+  dplyr::mutate(action = ifelse(is.na(l3), l2, paste(l2, " ", l3))) %>%
+  dplyr::mutate_at(dplyr::vars(l1), dplyr::recode,
+                   "Building Tuneup or Utility Improvements"="Commissioning") %>%
+  dplyr::mutate(l1 = ifelse(l1 %in% c("Advanced Metering", "Commissioning", "GSALink"), "Operational", l1)) %>%
+  distinct(l1) %>%
+  dplyr::mutate(l1 = gsub(" ", "-", l1)) %>%
+  .$l1 %>%
+  {.}
+
+period = "now"
+scenario = "measured"
+
+compile.targeting.by.action <- function(period, scenario, actions) {
+  images <- sprintf("targeting_by_action_slides_%s_%s_%s_bp_measured_input", period, scenario,
+                    c("toplevel", "highlevel", "joint_highlevel"))
+  images <- c(images,
+              sprintf("targeting_by_action_slides_%s_%s_%s_detaillevel_bp_measured_input",
+                      actions, period, scenario))
+  contents = sapply(images, function(imagei) {
+    newlines <- c("\\begin{figure}[H]",
+                  "\\centering",
+                  sprintf("\\includegraphics[width=0.9\\linewidth]{../images/%s}",
+                          imagei),
+                  "\\end{figure}")
+    return(newlines)
+  })
+  con <- file(sprintf("../images/targeting_by_action_noaa_%s_%s.tex", period, scenario), open = "w+")
+  writeLines(contents, con, sep = "\n", useBytes = FALSE)
+  close(con)
+}
+
+compile.targeting.by.action("now", "measured", actions)
+for (period in c("mid-century", "late-century")) {
+  for (scenario in c("rcp45", "rcp85")) {
+    compile.targeting.by.action(period, scenario, actions)
+  }
+}
+
+compile.targeting.by.action.roi <- function(period, scenario) {
+  images <- sprintf("targeting_by_action_roi_%s_%s_%s_bp_measured_input.png",
+                    period, scenario, c("toplevel", "highlevel"))
+  contents = sapply(images, function(imagei) {
+    newlines <- c("\\begin{figure}[H]",
+                  "\\centering",
+                  sprintf("\\includegraphics[width=0.9\\linewidth]{../images/%s}",
+                          imagei),
+                  "\\end{figure}")
+    return(newlines)
+  })
+  con <- file(sprintf("../images/targeting_by_action_roi_noaa_%s_%s.tex", period, scenario), open = "w+")
+  writeLines(contents, con, sep = "\n", useBytes = FALSE)
+  close(con)
+}
+
+compile.targeting.by.action.roi("now", "measured")
+for (period in c("mid-century", "late-century")) {
+  for (scenario in c("rcp45", "rcp85")) {
+    compile.targeting.by.action.roi(period, scenario)
+  }
+}
