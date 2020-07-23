@@ -554,8 +554,6 @@ retrofit.avg.energy.enough.data %>%
 
 usethis::use_data(retrofit.avg.energy.enough.data, overwrite = T)
 
-load("../data/retrofit.avg.energy.enough.data.rda")
-
 weather.data.building = retrofit.avg.energy.enough.data %>%
   dplyr::distinct(BLDGNUM) %>%
   dplyr::mutate(exists = file.exists(paste0("weather_data/ghcnd_by_building_retrofit/", BLDGNUM, "_TMIN.csv"))) %>%
@@ -600,12 +598,6 @@ df.prcp <- df.prcp %>%
   dplyr::rename(PRCP=weighted) %>%
   {.}
 
-## optional join precipitation
-summary(df.prcp)
-
-lowerbound = min(df.prcp$PRCP)
-upperbound = max(df.prcp$PRCP)
-
 df.weather.retro = df.tmin %>%
   dplyr::bind_rows(df.tmax) %>%
   tidyr::spread(variable, weighted) %>%
@@ -620,7 +612,6 @@ upperbound = max(df.weather.retro$AVGMINMAX)
 breaks = c(lowerbound, seq(10, 90, by=10), upperbound)
 break_labels = c("<10", sprintf("[%s-%s)", seq(10, 80, by=10), seq(20, 90, by=10)), ">90")
 
-## fixme: check missing data
 df.weather.retro.bin =
   df.weather.retro %>%
   dplyr::mutate(`value_label`=dplyr::case_when(`AVGMINMAX` < 10 ~ "<10",
@@ -748,6 +739,7 @@ usethis::use_data(retrofit.weather, overwrite = T)
 building.with.36month.pre.weather = retrofit.weather %>%
   dplyr::filter(retro.status == "pre") %>%
   dplyr::group_by(BLDGNUM, Substantial_Completion_Date, retro.status, is.real.retrofit) %>%
+  ## 19 climate models and one measured data
   dplyr::filter(n()==36 * (19 * 2 + 1)) %>%
   dplyr::ungroup() %>%
   dplyr::distinct(BLDGNUM, Substantial_Completion_Date) %>%
@@ -792,8 +784,6 @@ retrofit.alldata %>%
 ## 2 TRUE               270
 
 usethis::use_data(retrofit.alldata, overwrite = T)
-
-load("../data/retrofit.alldata.rda")
 
 ## check weather station distance
 weather.files = list.files("weather_data/ghcnd_by_building_retrofit/", "_TMIN.csv")
@@ -842,6 +832,7 @@ df.tmax %>%
 ## 3rd Qu.: 8.0524   3rd Qu.:40.75
 ## Max.   :31.4303   Max.   :98.42
 
+## estimate propensity score
 to.estimate = retrofit.alldata %>%
   dplyr::filter(retro.status == "pre") %>%
   dplyr::mutate(is.office = (`Building_Type`=="Office")) %>%
@@ -917,6 +908,14 @@ retrofit.alldata <- retrofit.alldata %>%
   {.}
 
 usethis::use_data(retrofit.alldata, overwrite = T)
+
+load("../data/retrofit.alldata.rda")
+
+retrofit.alldata %>%
+  dplyr::distinct(BLDGNUM, is.real.retrofit) %>%
+  dplyr::group_by(is.real.retrofit) %>%
+  dplyr::count() %>%
+  dplyr::ungroup()
 
 retrofit.alldata.highprop <- retrofit.alldata %>%
   dplyr::filter(0.05 < propensity.estimate, propensity.estimate < 0.95) %>%
