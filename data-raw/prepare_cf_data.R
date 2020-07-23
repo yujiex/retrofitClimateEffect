@@ -2,8 +2,33 @@ library("dplyr")
 
 load("../data/retrofit.alldata.rda")
 
-retrofit.alldata %>%
-  names()
+disagg = readr::read_csv("lean_result_GAS.csv") %>%
+  dplyr::bind_rows(readr::read_csv("lean_result_KWHR.csv")) %>%
+  {.}
+disagg <- disagg %>%
+  dplyr::mutate(htcl = ifelse(baseload < 0, htcl - baseload, htcl)) %>%
+  dplyr::mutate(baseload = pmax(baseload, 0)) %>%
+  dplyr::group_by(BLDGNUM, `Substantial_Completion_Date`, variable) %>%
+  ## no negative heating cooling load, removed 30 records
+  dplyr::filter(sum(htcl < 0) == 0) %>%
+  dplyr::ungroup() %>%
+  {.}
+
+pre.lean <- disagg %>%
+  dplyr::filter(retro.status == "pre") %>%
+  dplyr::select(-cvrmse, -cp, -retro.status) %>%
+  tidyr::pivot_wider(names_from = variable, values_from = baseload:htcl,
+                     values_fill = list("baseload"=0, "htcl"=0)) %>%
+  {.}
+
+lean.diff = disagg %>%
+  dplyr::select(-cvrmse, -cp) %>%
+  tidyr::gather(leantype, value, baseload:htcl) %>%
+  tidyr::unite(col="variable", leantype, variable) %>%
+  tidyr::spread(retro.status, value) %>%
+  dplyr::mutate(eui.diff = post - pre) %>%
+  dplyr::select(-post, -pre) %>%
+  {.}
 
 pre.nonenergy = retrofit.alldata %>%
   dplyr::filter(retro.status == "pre") %>%
@@ -57,3 +82,12 @@ non.action.data.binary = pre.nonenergy %>%
   {.}
 
 usethis::use_data(non.action.data.binary, overwrite=T)
+
+non.action.data.lean = pre.nonenergy %>%
+  dplyr::left_join(pre.energy, by=c("BLDGNUM", "is.real.retrofit", "Substantial_Completion_Date")) %>%
+  dplyr::inner_join(pre.lean, by=c("BLDGNUM", "Substantial_Completion_Date")) %>%
+  dplyr::left_join(lean.diff, by=c("BLDGNUM", "Substantial_Completion_Date")) %>%
+  dplyr::select(-with.leed.post) %>%
+  {.}
+
+usethis::use_data(non.action.data.lean, overwrite=T)
