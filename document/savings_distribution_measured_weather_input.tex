@@ -56,10 +56,80 @@
 \setcounter{tocdepth}{4}    % how many sectioning levels to show in ToC
 
 \begin{document}
-\title{Savings distribution fitting with NOAA measured weather input}
+\title{Estimation results}
 \maketitle
 \tableofcontents
 \newpage
+\section{Effect on disaggregated energy with LEAN analysis}
+\subsection{Result summary table}
+In the subsection, the estimated retrofit effect on baseload and air conditional
+load for electricity and gas is reported. The effect are in terms of annual average consumption
+savings in kBtu/sqft/year. The positive values means savings.
+\subsubsection{Treated}
+\input{../tables/summary_treated_baseload_KWHR_toplevel_bp}
+\input{../tables/summary_treated_baseload_KWHR_joint_highlevel_bp}
+\input{../tables/summary_treated_baseload_KWHR_highlevel_bp}
+\input{../tables/summary_treated_baseload_KWHR_detaillevel_bp}
+\input{../tables/summary_treated_baseload_GAS_toplevel_bp}
+\input{../tables/summary_treated_baseload_GAS_joint_highlevel_bp}
+\input{../tables/summary_treated_baseload_GAS_highlevel_bp}
+\input{../tables/summary_treated_baseload_GAS_detaillevel_bp}
+\input{../tables/summary_treated_htcl_KWHR_toplevel_bp}
+\input{../tables/summary_treated_htcl_KWHR_joint_highlevel_bp}
+\input{../tables/summary_treated_htcl_KWHR_highlevel_bp}
+\input{../tables/summary_treated_htcl_KWHR_detaillevel_bp}
+\input{../tables/summary_treated_htcl_GAS_toplevel_bp}
+\input{../tables/summary_treated_htcl_GAS_joint_highlevel_bp}
+\input{../tables/summary_treated_htcl_GAS_highlevel_bp}
+\input{../tables/summary_treated_htcl_GAS_detaillevel_bp}
+\subsubsection{Untreated under mid-century RCP4.5}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP45_toplevel_bp}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP45_joint_highlevel_bp}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP45_highlevel_bp}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP45_detaillevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP45_toplevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP45_joint_highlevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP45_highlevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP45_detaillevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP45_toplevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP45_joint_highlevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP45_highlevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP45_detaillevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP45_toplevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP45_joint_highlevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP45_highlevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP45_detaillevel_bp}
+\subsubsection{Untreated under mid-century RCP8.5}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP85_toplevel_bp}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP85_joint_highlevel_bp}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP85_highlevel_bp}
+\input{../tables/summary_control_baseload_KWHR_mid-century_RCP85_detaillevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP85_toplevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP85_joint_highlevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP85_highlevel_bp}
+\input{../tables/summary_control_baseload_GAS_mid-century_RCP85_detaillevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP85_toplevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP85_joint_highlevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP85_highlevel_bp}
+\input{../tables/summary_control_htcl_KWHR_mid-century_RCP85_detaillevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP85_toplevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP85_joint_highlevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP85_highlevel_bp}
+\input{../tables/summary_control_htcl_GAS_mid-century_RCP85_detaillevel_bp}
+
+\subsection{Density of the treated under current climate}
+\input{../images/cf_treated_noaa_lean}
+\subsection{Stacked density of the non-treated for different climate period under RCP4.5}
+\input{../images/cf_control_noaa_rcp45_lean_stack}
+\subsection{Individual density per model-scenario of the non-treated for different
+  climate period under RCP4.5}
+\input{../images/cf_control_noaa_rcp45_lean}
+\subsection{Stacked density of the non-treated for different climate period under RCP8.5}
+\input{../images/cf_control_noaa_rcp85_lean_stack}
+\subsection{Individual density per model-scenario of the non-treated for different
+  climate period under RCP8.5}
+\input{../images/cf_control_noaa_rcp85_lean}
+
 \section{Effect on electricity and gas consumption}
 \subsection{Result summary table}
 In the subsection, the estimated retrofit effect on electricity and gas
@@ -104,6 +174,22 @@ savings in kBtu/sqft/year. The positive values means savings.
 \subsection{Individual density per model-scenario of the non-treated for different
   climate period under RCP8.5}
 \input{../images/cf_control_noaa_rcp85}
+\subsection{The benefit of targeting by action, based on energy saving, current climate}
+\input{../images/targeting_by_action_noaa_now_measured}
+\subsection{The benefit of targeting by action, based on energy saving,
+  mid-century, RCP4.5}
+\input{../images/targeting_by_action_noaa_mid-century_rcp45}
+\subsection{The benefit of targeting by action, based on energy saving,
+  mid-century, RCP8.5}
+\input{../images/targeting_by_action_noaa_mid-century_rcp85}
+\subsection{The benefit of targeting by action, based on ROI, current climate}
+\input{../images/targeting_by_action_roi_noaa_now_measured}
+\subsection{The benefit of targeting by action, based on ROI,
+  mid-century, RCP4.5}
+\input{../images/targeting_by_action_roi_noaa_mid-century_rcp45}
+\subsection{The benefit of targeting by action, based on ROI,
+  mid-century, RCP8.5}
+\input{../images/targeting_by_action_roi_noaa_mid-century_rcp85}
 \section{Effect on obtaining LEED after retrofit}
 \subsection{Result summary table}
 In the subsection, the estimated retrofit effect on obtaining LEED
