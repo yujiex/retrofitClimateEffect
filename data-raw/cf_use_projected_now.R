@@ -14,19 +14,34 @@ load("../data/non.action.data.rda")
 
 load("../data/non.action.data.binary.rda")
 
+load("../data/non.action.data.lean.rda")
+
 options(tibble.width=NULL)
+
+non.action.data %>%
+  tibble::as_tibble()
 
 ## compare results under different climate scenario
 load("../data/cmip5.bin.period.rda")
 
 load("../data/cmip5.bin.period.threeyear.rda")
 
+non.action.data.lean <- non.action.data.lean %>%
+  dplyr::rename(lean.diff = eui.diff) %>%
+  {.}
+
 ## prev.action: df with previous action
 ## fuel.and.other: df with other fields
 ## kw: key words in file naming
-fit.cf <- function(prev.action, fuel.and.other, yvarname, kw, projected.weather=TRUE, bound.propensity=TRUE) {
+fit.cf <- function(prev.action, fuel.and.other, yvarname, kw, projected.weather=TRUE, bound.propensity=TRUE,
+                   target.variable = NA) {
   if (bound.propensity) {
     kw = paste0(kw, "_bp")
+  }
+  if (!is.na(target.variable)) {
+    fuel.and.other <- fuel.and.other %>%
+      dplyr::filter(variable == target.variable) %>%
+      {.}
   }
   dfs.by.action = prev.action %>%
     dplyr::group_by(target.action) %>%
@@ -73,7 +88,7 @@ fit.cf <- function(prev.action, fuel.and.other, yvarname, kw, projected.weather=
         {.}
       X = df.allfeature %>%
         dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`, -model, -scenario) %>%
-        dplyr::select(-yvarname) %>%
+        dplyr::select(-all_of(yvarname)) %>%
         as.matrix() %>%
         {.}
       Y = df.allfeature[[yvarname]]
@@ -105,7 +120,7 @@ fit.cf <- function(prev.action, fuel.and.other, yvarname, kw, projected.weather=
       X.new <- new.data %>%
         dplyr::select(-period, -model, -scenario) %>%
         dplyr::select(-BLDGNUM, -is.real.retrofit, -`Substantial_Completion_Date`) %>%
-        dplyr::select(-yvarname) %>%
+        dplyr::select(-all_of(yvarname)) %>%
         dplyr::select(GROSSSQFT:htdd, `<10`:`>90`, everything()) %>%
         as.matrix() %>%
         {.}
@@ -137,20 +152,29 @@ fit.cf <- function(prev.action, fuel.and.other, yvarname, kw, projected.weather=
   }
   if (yvarname == "with.leed.post") {
     suf = paste0(suf, "_", "leed")
+  } else if (yvarname == "lean.diff") {
+    suf = paste0(suf, "_", "lean")
   }
+  if (!is.na(target.variable)) {
+    suf <- paste0(suf, "_", target.variable)
+  }
+  print(suf)
   output.result = dfs.result.prediction %>%
     dplyr::bind_rows() %>%
     {.}
   output.result %>%
     readr::write_csv(sprintf("../tables/grf_result_%s%s.csv", kw, suf))
+  print(sprintf("../tables/grf_result_%s%s.csv", kw, suf))
   output.result %>%
     dplyr::select(BLDGNUM, `Substantial_Completion_Date`, is.real.retrofit,
                   action, fuel, period, model, scenario, predictions,
                   variance.estimates) %>%
     readr::write_csv(sprintf("../tables/grf_result_fewcol_%s%s.csv", kw, suf))
+  print(sprintf("../tables/grf_result_fewcol_%s%s.csv", kw, suf))
   dfs.var.importance %>%
     dplyr::bind_rows() %>%
     readr::write_csv(sprintf("../tables/grf_var_importance_%s%s.csv", kw, suf))
+  print(sprintf("../tables/grf_var_importance_%s%s.csv", kw, suf))
 }
 
 ## predicts energy
@@ -184,13 +208,10 @@ fit.cf(retrofit_prev_actions_detaillevel, non.action.data.binary, yvarname="with
 ## use NOAA measured input
 set.seed(0)
 fit.cf(retrofit_prev_actions_highlevel, non.action.data, yvarname="eui.diff", "highlevel", projected.weather=FALSE, bound.propensity=TRUE)
-
 set.seed(0)
 fit.cf(retrofit_prev_actions_toplevel, non.action.data, yvarname="eui.diff", "toplevel", projected.weather=FALSE, bound.propensity=TRUE)
-
 set.seed(0)
 fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data, yvarname="eui.diff", "joint_highlevel", projected.weather=FALSE, bound.propensity=TRUE)
-
 set.seed(0)
 fit.cf(retrofit_prev_actions_detaillevel, non.action.data, yvarname="eui.diff", "detaillevel", projected.weather=FALSE, bound.propensity=TRUE)
 
@@ -208,3 +229,29 @@ fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data.binary, yvarname="
 set.seed(0)
 fit.cf(retrofit_prev_actions_detaillevel, non.action.data.binary, yvarname="with.leed.post", "detaillevel", projected.weather=FALSE, bound.propensity=TRUE)
 
+## predict lean
+## output retrofit effect estimates
+set.seed(0)
+fit.cf(retrofit_prev_actions_highlevel, non.action.data.lean, yvarname="lean.diff", kw="highlevel", projected.weather=FALSE, bound.propensity=TRUE)
+set.seed(0)
+fit.cf(retrofit_prev_actions_toplevel, non.action.data.lean, yvarname="lean.diff", "toplevel", projected.weather=FALSE, bound.propensity=TRUE)
+set.seed(0)
+fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data.lean, yvarname="lean.diff", "joint_highlevel", projected.weather=FALSE, bound.propensity=TRUE)
+set.seed(0)
+fit.cf(retrofit_prev_actions_detaillevel, non.action.data.lean, yvarname="lean.diff", "detaillevel", projected.weather=FALSE, bound.propensity=TRUE)
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_toplevel, non.action.data.lean, yvarname="lean.diff", "toplevel", projected.weather=TRUE, bound.propensity=TRUE)
+
+set.seed(0)
+fit.cf(retrofit_prev_actions_highlevel, non.action.data.lean, yvarname="lean.diff", kw="highlevel", projected.weather=TRUE, bound.propensity=TRUE)
+
+for (tv in c("htcl_GAS", "htcl_KWHR")) {
+  set.seed(0)
+  fit.cf(retrofit_prev_actions_joint_highlevel, non.action.data.lean, yvarname="lean.diff", "joint_highlevel", projected.weather=TRUE, bound.propensity=TRUE, target.variable = tv)
+}
+
+for (tv in c("baseload_GAS", "baseload_KWHR", "htcl_GAS", "htcl_KWHR")) {
+  set.seed(0)
+  fit.cf(retrofit_prev_actions_detaillevel, non.action.data.lean, yvarname="lean.diff", "detaillevel", projected.weather=TRUE, bound.propensity=TRUE, target.variable = tv)
+}
